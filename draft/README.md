@@ -128,6 +128,77 @@ is modelled as prior-year fantasy finish. A real league drafting off consensus r
 is a tougher opponent than that, and one that already knows the depth chart, so treat
 +134 as an upper bound.
 
+## Does it win leagues?
+
+`league_backtest.py`, `consensus.py`. Everything above measures accuracy, but you don't
+win a league by projecting well. You win by beating eleven other managers, and most of
+them draft and set lineups from expert consensus (FantasyPros ECR). A model earns
+something only where it disagrees with consensus and is right. So this is the test
+that counts. The design was argued out with Codex (gpt-5.6-luna) over five rounds,
+including two rounds that blocked it until the flaws below were fixed.
+
+- **Leagues:** 12 teams, PPR, on each holdout season 2021–25. Eleven consensus seats
+  draft from the preseason overall ECR, each perturbed by the experts' own spread, and
+  start lineups from weekly positional ECR. One test seat swaps in our draft, our
+  lineups, or both. Everything else stays the same.
+- **Inputs:** everything is as of the decision. Boards are fit only on earlier seasons,
+  weekly projections use only earlier weeks, and consensus comes from scrapes dated
+  before the Sunday slate. Availability is what's known before kickoff (active roster,
+  not on bye, not Out or Doubtful). A starter who doesn't play scores zero, whichever
+  policy started him.
+- **Scoring:** what players actually did. Weeks 1–14 are head-to-head on random
+  schedules, and the top six go to a weeks 15–17 playoff.
+- **The metric:** the headline is the paired change in championship probability
+  against a consensus seat in the same league. The deciding statistic is the paired
+  change in all-play win rate, which is schedule-free and far less noisy. A change is
+  kept only if its pooled all-play gain is positive, positive in at least 4 of 5
+  seasons, and costs no more than 1 point of title odds. That rule was declared before
+  any result was run. Seasons are the independent unit, since the player outcomes are
+  fixed.
+
+Paired changes against a consensus seat, 20 drafts × 12 seats × 20 schedules per season:
+
+| the test seat uses | title odds | all-play | all-play by season |
+|---|---|---|---|
+| our draft, consensus lineups | −3.2 pp | +1.7 pp | +4.7 +9.9 −4.9 −1.4 −0.1 |
+| consensus draft, our lineups | −0.8 pp | −1.7 pp | negative in all five |
+| consensus draft, blended lineups | +0.2 pp | −0.3 pp | |
+| exact consensus draft, consensus lineups | **+9.2 pp** | +8.5 pp | positive in all five |
+| blended draft *minus* exact consensus draft | −0.8 pp | +2.6 pp | +6.2 +4.3 −1.7 +3.9 +0.1 |
+
+If every opponent follows consensus exactly (the sensitivity check), our draft loses
+7.6 points of title odds and our lineups lose 2.0. The blended draft beats exact
+consensus by 6.1 points of all-play but not in title odds (−0.1), and only in
+2021–22.
+
+What it says:
+
+- **No current policy is shown to beat consensus.** That holds for this five-season
+  simulation under the rule declared up front. The weekly model sets worse lineups
+  than weekly ECR in all five seasons under both opponent designs, so for start/sit
+  today, use consensus. Blending the two only ties it.
+- **The draft board loses title odds.** It takes a quarterback in rounds 1–3 in 58 of
+  60 drafts. The likely cause: pricing QBs against the last starter overvalues them in
+  a one-QB league, where a streamable QB is always on waivers. Its rosters hold up
+  through week 14, then fade in the playoff weeks. It's not a draft recommendation
+  until that's fixed.
+- **The biggest effect is noise, not modelling.** Giving the test seat noise-free
+  consensus rankings, while the opponents keep their noise, raises title odds by about
+  9 points. That's largely built in, since the opponents' deviations are pure error
+  here. It isolates ranking noise, not an edge a model could carry over.
+- **Blending model and consensus** (averaging ranks) adds some all-play over exact
+  consensus, but only in some seasons and with no title gain. Not shown to help.
+- **The room is in-season.** A simulated ceiling, lineups picked with hindsight,
+  sits about 16 points of all-play above consensus lineups. That and waivers are
+  where an edge could exist, and where to build next, tested against this harness
+  with the same rule.
+
+Caveats: the five seasons are the independent evidence, not the thousands of league
+seats. Within one league seat, a paired title difference moves by 9–27 points (sd)
+with the schedule alone, so no title effect here is precise. That's why all-play
+decides and title odds are only the headline. The opponents are synthetic (consensus
+plus noise, not real draft behaviour), and there are no waivers or trades.
+
 ## Using it
 
 ```bash
@@ -138,6 +209,8 @@ is a tougher opponent than that, and one that already knows the depth chart, so 
 .venv/bin/python draft/vbd.py                # replacement levels and VBD board
 .venv/bin/python draft/backtest.py           # simulate drafts, score the strategies
 .venv/bin/python draft/board.py 2026         # board for the upcoming season
+.venv/bin/python draft/consensus.py          # FantasyPros consensus ranks, as of each decision
+.venv/bin/python draft/league_backtest.py    # does it win leagues vs consensus? (--noise 0: exact opponents)
 ```
 
 Then on draft day:
@@ -285,6 +358,9 @@ manager reading consensus rankings may see it differently.
 
 ## Known limits
 
+- **It doesn't beat consensus yet.** In the league backtest neither the draft board
+  nor the weekly model improves title odds over expert consensus. See "Does it win
+  leagues?".
 - **Rookies come from draft slot and depth-chart role only.** Nothing is known about them
   beyond where they were picked and where they sit on the week-1 chart. Rookie tight
   ends still project about 30 points low.

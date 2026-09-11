@@ -48,7 +48,9 @@ def project_upcoming(target, rookies=False):
     nxt["season_games"] = 17
     nxt["prev_games"] = last.games
     if rookies:
-        nxt = pd.concat([nxt, rookie_rows(target, set(s.player_id))], ignore_index=True)
+        # "Known" means history before the target season; for a past season, s also
+        # holds that year's rookies and every later season.
+        nxt = pd.concat([nxt, rookie_rows(target, set(prior.player_id))], ignore_index=True)
 
     both = pd.concat([prior, nxt], ignore_index=True)
     hist = P.player_history(both)
