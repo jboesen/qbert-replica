@@ -34,13 +34,16 @@ Label: draft + start/sit edge against synthetic consensus - no waivers, no trade
     .venv/bin/python draft/league_backtest.py
 """
 import sys
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
 
 sys.path.insert(0, "draft")
 from vbd import LEAGUE, add_vbd
+from draft_dp import BENCH_VALUE, snake_picks
 import board as B
+import stack as K
 import weekly as W
 
 POS = ["QB", "RB", "WR", "TE"]
@@ -104,7 +107,8 @@ class Season:
         self.y = y
         board = B.project_upcoming(y, rookies=True)
         board = board[(board.own_w > 4) | ((board.exp == 0) & board.role.isin(["d1", "d2"]))]
-        board, _, _ = add_vbd(board.set_index("player_id"))
+        raw = board.drop_duplicates("player_id").set_index("player_id")
+        board, _, _ = add_vbd(raw)
         ecr = pd.read_parquet("data/ecr_preseason_overall.parquet")
         ecr = ecr[ecr.season == y].set_index("player_id")
 
@@ -203,6 +207,24 @@ class Season:
         ok = np.where(np.isfinite(self.ecr_mean))[0]
         self.exact_order = list(ok[np.argsort(self.ecr_mean[ok], kind="stable")])
 
+        # Values for the market-aware draft (prereg.md): consensus-implied season points,
+        # and the stacked projection, with the curve and weights fit only on seasons
+        # before y; both priced over replacement.
+        crv, coefs = K.fit_before(y)
+        t = K.table(y, raw)
+        cons = pd.Series(K.ecr_points(crv, t.pos, t["rank"]), index=t.index)
+        self.cons_vbd = self._vbd(cons, ids)
+        self.stack_vbd = self._vbd(K.apply(t, crv, coefs), ids)
+        # Who the opponents are predicted to take next: the consensus overall order.
+        self.market_key = np.where(np.isfinite(self.ecr_mean), self.ecr_mean, 1e6)
+
+    def _vbd(self, pts, ids):
+        b = pd.DataFrame({"position": self.pos, "proj_points": pts.reindex(ids).values},
+                         index=ids)
+        b = b[b.position.isin(POS) & b.proj_points.notna()]
+        b, _, _ = add_vbd(b)
+        return b.vbd.reindex(ids).values
+
 
 # ---------------------------------------------------------------- draft and lineups
 
@@ -225,16 +247,87 @@ def allowed(pos, c, rnd):
     return True
 
 
+def plan_position(horizon, need):
+    """Fry-Lundberg-Ohlmann: the position to take now so the finished lineup is worth
+    the most, given the best player expected at each position at each of my picks.
+    Same recursion and bench weights as draft_dp.plan."""
+    keys = POS + ["FLEX"]
+
+    @lru_cache(maxsize=None)
+    def f(i, state):
+        if i == len(horizon):
+            return 0.0, None
+        nd = dict(zip(keys, state))
+        best = (-1e18, None)
+        for p in POS:
+            v = horizon[i][p]
+            if nd[p] > 0:
+                nx = dict(nd); nx[p] -= 1
+            elif nd["FLEX"] > 0 and p in FLEX:
+                nx = dict(nd); nx["FLEX"] -= 1
+            else:
+                nx, v = dict(nd), v * BENCH_VALUE[p]
+            val, _ = f(i + 1, tuple(nx[k] for k in keys))
+            if v + val > best[0]:
+                best = (v + val, p)
+        return best
+
+    return f(0, tuple(need[k] for k in keys))[1]
+
+
+def market_policy(S, seat, value):
+    """prereg.md: value players by `value`, predict that opponents take the consensus
+    order until my next pick, and plan the position with plan_position."""
+    mine = snake_picks(seat, TEAMS, ROUNDS)
+
+    def pick(taken, c, rnd, pick_no):
+        avail = np.where(~taken & np.isfinite(value))[0]
+        if not len(avail):
+            return None
+        order = avail[np.argsort(S.market_key[avail], kind="stable")]
+        pos_o, val_o = S.pos[order], value[order]
+        future = [p for p in mine if p >= pick_no]
+        horizon = []
+        for i, pk in enumerate(future):
+            head = pos_o[:(pk - future[0]) - i]            # taken by others before pk
+            row = {}
+            for p in POS:
+                vals = val_o[pos_o == p]
+                gone = int((head == p).sum())
+                row[p] = vals[gone:].max() if len(vals) > gone else 0.0
+            horizon.append(row)
+        choice = plan_position(horizon, needs(c))
+        if allowed(choice, c, rnd):
+            at = avail[S.pos[avail] == choice]
+            return at[np.argmax(value[at])]
+        for x in avail[np.argsort(-value[avail])]:            # the plan's slot is closed
+            if allowed(S.pos[x], c, rnd):
+                return x
+        return None
+
+    return pick
+
+
 def draft(S, orders):
-    """Snake draft; each seat takes the first player on its own list it may take."""
+    """Snake draft; each seat takes the first player on its own list it may take, or
+    asks its policy, when the seat's entry is a function instead of a list."""
     taken = np.zeros(len(S.ids), bool)
     rosters = [[] for _ in range(TEAMS)]
     counts = [dict.fromkeys(POS, 0) for _ in range(TEAMS)]
     ptr = [0] * TEAMS
+    pick_no = 0
     for rnd in range(ROUNDS):
         seats = range(TEAMS) if rnd % 2 == 0 else reversed(range(TEAMS))
         for seat in seats:
+            pick_no += 1
             order = orders[seat]
+            if callable(order):
+                p = order(taken, counts[seat], rnd, pick_no)
+                if p is not None:
+                    taken[p] = True
+                    rosters[seat].append(p)
+                    counts[seat][S.pos[p]] += 1
+                continue
             i = ptr[seat]
             while i < len(order):
                 p = order[i]
@@ -340,8 +433,10 @@ def run():
                 # pure error by construction, so following consensus exactly already beats
                 # them; the blend has to be judged against this, not against "ecr".
                 own = {"model": S.model_order, "ecr": ecr_orders[TEAMS], "blend": S.blend_order,
-                       "exact": S.exact_order}
-                for d_arm in ("model", "ecr", "blend", "exact"):
+                       "exact": S.exact_order,
+                       "market": market_policy(S, seat, S.cons_vbd),
+                       "market_stack": market_policy(S, seat, S.stack_vbd)}
+                for d_arm in ("model", "ecr", "blend", "exact", "market", "market_stack"):
                     orders = list(ecr_orders[:TEAMS])
                     orders[seat] = own[d_arm]
                     rosters = draft(S, orders)
@@ -414,6 +509,27 @@ def report(d):
               f"{100 * diff.all_play.mean():+.1f} pp  (by season "
               + " ".join(f"{100 * v:+.1f}" for v in by) + f")   playoff "
               f"{100 * diff.playoff.mean():+.1f} pp")
+
+    # The preregistered test (prereg.md): market-aware drafts against exact consensus.
+    print("\npreregistered (prereg.md): draft minus exact-consensus draft, consensus lineups "
+          "(season-cluster bootstrap 90% interval)")
+    b = d[(d.draft == "exact") & (d.lineup == "ecr")].set_index(key)[m]
+    for arm in ("market", "market_stack"):
+        rng = np.random.default_rng(1)                   # per arm, as prereg.md declares
+        a = d[(d.draft == arm) & (d.lineup == "ecr")].set_index(key)[m]
+        diff = a - b.loc[a.index]
+        by = diff.groupby("season").all_play.mean()
+        seasons = diff.groupby("season").mean()
+        boot = pd.DataFrame([seasons.loc[rng.choice(seasons.index, len(seasons))].mean()
+                             for _ in range(2000)])
+        lo, hi = boot.quantile(.05), boot.quantile(.95)
+        keep = diff.all_play.mean() > 0 and (by > 0).sum() >= 4 and diff.title.mean() >= TITLE_GUARD
+        print(f"  {arm:13s} title {100 * diff.title.mean():+.1f} pp [{100 * lo.title:+.1f}, "
+              f"{100 * hi.title:+.1f}]   all-play {100 * diff.all_play.mean():+.1f} pp "
+              f"[{100 * lo.all_play:+.1f}, {100 * hi.all_play:+.1f}]  by season "
+              + " ".join(f"{100 * v:+.1f}" for v in by)
+              + f"   playoff {100 * diff.playoff.mean():+.1f} pp   -> "
+              + ("passes this design" if keep else "fails this design"))
 
     print(f"\nschedule sensitivity: for a fixed roster and lineups, the title rate moves by "
           f"{100 * d.title_sched_sd.mean():.1f} pp (sd) across schedule draws alone")
