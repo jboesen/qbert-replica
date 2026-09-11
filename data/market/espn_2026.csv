@@ -1,0 +1,102 @@
+rank,player,team,pos,pass_yds,pass_td,pass_int,rush_yds,rush_td,rec,rec_yds,rec_td
+1,Jahmyr Gibbs,DET,RB,0,0,0,1413,14,68,546,3
+2,Bijan Robinson,ATL,RB,0,0,0,1371,8,76,707,3
+3,Ja'Marr Chase,CIN,WR,0,0,0,21,0,120,1507,11
+4,Puka Nacua,LAR,WR,0,0,0,91,1,123,1586,10
+5,Jonathan Taylor,IND,RB,0,0,0,1501,12,50,390,1
+6,Jaxon Smith-Njigba,SEA,WR,0,0,0,25,0,117,1569,9
+7,Christian McCaffrey,SF,RB,0,0,0,1128,9,79,678,5
+8,Amon-Ra St. Brown,DET,WR,0,0,0,13,0,118,1425,10
+9,James Cook III,BUF,RB,0,0,0,1403,11,36,302,2
+10,CeeDee Lamb,DAL,WR,0,0,0,13,0,103,1376,7
+11,Justin Jefferson,MIN,WR,0,0,0,11,0,111,1370,7
+12,De'Von Achane,MIA,RB,0,0,0,1310,5,65,512,3
+13,Omarion Hampton,LAC,RB,0,0,0,1085,9,52,363,2
+14,Chase Brown,CIN,RB,0,0,0,1036,7,64,434,3
+15,Saquon Barkley,PHI,RB,0,0,0,1284,9,43,371,2
+16,Derrick Henry,BAL,RB,0,0,0,1505,13,21,210,1
+17,Ashton Jeanty,LV,RB,0,0,0,1122,7,65,492,2
+18,Drake London,ATL,WR,0,0,0,0,0,102,1249,7
+19,Jeremiah Love,ARI,RB,0,0,0,1119,7,65,486,2
+20,A.J. Brown,NE,WR,0,0,0,0,0,86,1218,7
+21,Trey McBride,ARI,TE,0,0,0,0,0,108,1023,5
+22,Brock Bowers,LV,TE,0,0,0,15,0,99,999,7
+23,Nico Collins,HOU,WR,0,0,0,12,0,87,1196,7
+24,Chris Olave,NO,WR,0,0,0,0,0,91,1194,7
+25,Rashee Rice,KC,WR,0,0,0,43,1,92,1082,8
+26,Josh Allen,BUF,QB,3947,26,12,580,12,0,0,0
+27,George Pickens,DAL,WR,0,0,0,0,0,80,1115,8
+28,Kenneth Walker III,KC,RB,0,0,0,1239,9,48,376,2
+29,Garrett Wilson,NYJ,WR,0,0,0,11,0,100,1175,5
+30,Breece Hall,NYJ,RB,0,0,0,1162,8,52,440,3
+31,Javonte Williams,DAL,RB,0,0,0,1263,11,37,218,2
+32,Kyren Williams,LAR,RB,0,0,0,1070,10,33,223,1
+33,Malik Nabers,NYG,WR,0,0,0,23,0,85,1128,7
+34,DeVonta Smith,PHI,WR,0,0,0,0,0,91,1129,6
+35,Travis Etienne Jr.,NO,RB,0,0,0,1139,6,45,389,2
+36,Tetairoa McMillan,CAR,WR,0,0,0,0,0,83,1182,6
+37,Zay Flowers,BAL,WR,0,0,0,57,0,82,1170,5
+38,Emeka Egbuka,TB,WR,0,0,0,12,0,70,1126,7
+39,Quinshon Judkins,CLE,RB,0,0,0,1246,9,32,222,1
+40,Ladd McConkey,LAC,WR,0,0,0,0,0,80,1039,6
+41,Tee Higgins,CIN,WR,0,0,0,0,0,73,955,8
+42,Colston Loveland,CHI,TE,0,0,0,0,0,81,900,5
+43,Lamar Jackson,BAL,QB,3886,26,10,671,4,0,0,0
+44,Davante Adams,LAR,WR,0,0,0,0,0,68,1013,11
+45,Cam Skattebo,NYG,RB,0,0,0,1012,7,45,332,1
+46,D'Andre Swift,CHI,RB,0,0,0,978,8,31,270,1
+47,Bhayshul Tuten,JAX,RB,0,0,0,995,7,34,252,1
+48,Jaylen Waddle,MIA,WR,0,0,0,12,0,77,993,6
+49,Bucky Irving,TB,RB,0,0,0,990,5,37,294,2
+51,Jayden Daniels,WSH,QB,3844,22,10,669,5,0,0,0
+52,Drake Maye,NE,QB,4097,27,11,532,4,0,0,0
+53,David Montgomery,HOU,RB,0,0,0,985,7,32,228,1
+54,Jadarian Price,SEA,RB,0,0,0,923,8,27,212,1
+55,Luther Burden III,CHI,WR,0,0,0,49,0,76,941,5
+56,TreVeyon Henderson,NE,RB,0,0,0,796,6,36,254,1
+57,Carnell Tate,TEN,WR,0,0,0,0,0,75,1023,4
+58,Mike Evans,SF,WR,0,0,0,0,0,57,889,6
+59,Marvin Harrison Jr.,ARI,WR,0,0,0,0,0,69,954,5
+60,Joe Burrow,CIN,QB,4131,33,11,189,2,0,0,0
+61,Rhamondre Stevenson,NE,RB,0,0,0,758,7,43,354,2
+62,Jalen Hurts,PHI,QB,3777,23,9,437,9,0,0,0
+63,Michael Pittman Jr.,PIT,WR,0,0,0,0,0,88,863,4
+64,Tony Pollard,TEN,RB,0,0,0,1043,5,30,182,0
+65,Harold Fannin Jr.,CLE,TE,0,0,0,21,0,84,825,3
+66,Kyle Pitts Sr.,ATL,TE,0,0,0,0,0,80,857,3
+67,DK Metcalf,PIT,WR,0,0,0,0,0,65,944,6
+68,George Kittle,SF,TE,0,0,0,0,0,77,828,6
+69,Courtland Sutton,DEN,WR,0,0,0,0,0,69,894,8
+70,Christian Watson,GB,WR,0,0,0,13,0,56,882,7
+71,Dak Prescott,DAL,QB,4108,30,12,186,2,0,0,0
+72,Parker Washington,JAX,WR,0,0,0,39,0,64,849,5
+73,Jaylen Warren,PIT,RB,0,0,0,809,5,46,320,1
+74,Sam LaPorta,DET,TE,0,0,0,0,0,78,796,5
+75,Kenny Gainwell,TB,RB,0,0,0,521,5,52,342,2
+76,Jaxson Dart,NYG,QB,3679,21,10,553,6,0,0,0
+77,Josh Jacobs,GB,RB,0,0,0,717,8,24,183,1
+78,Wan'Dale Robinson,TEN,WR,0,0,0,22,0,79,823,2
+79,Jonathon Brooks,CAR,RB,0,0,0,816,4,37,278,1
+80,Justin Herbert,LAC,QB,3849,26,11,406,2,0,0,0
+81,Michael Wilson,ARI,WR,0,0,0,0,0,71,860,3
+82,MarShawn Lloyd,GB,RB,0,0,0,620,5,21,148,0
+83,Caleb Williams,CHI,QB,3832,25,10,381,2,0,0,0
+84,Rico Dowdle,PIT,RB,0,0,0,993,6,29,211,1
+85,Stefon Diggs,WSH,WR,0,0,0,0,0,75,769,4
+86,Alec Pierce,IND,WR,0,0,0,0,0,60,940,3
+87,Travis Hunter,JAX,WR,0,0,0,11,0,38,452,1
+88,Tucker Kraft,GB,TE,0,0,0,0,0,68,777,4
+89,Chuba Hubbard,CAR,RB,0,0,0,764,4,41,299,1
+90,Jakobi Meyers,JAX,WR,0,0,0,32,0,70,766,5
+91,Trevor Lawrence,JAX,QB,3946,25,13,335,5,0,0,0
+92,Aaron Jones Sr.,MIN,RB,0,0,0,659,3,47,344,2
+93,Brian Thomas Jr.,JAX,WR,0,0,0,23,0,57,860,5
+94,Brock Purdy,SF,QB,4176,27,14,277,3,0,0,0
+95,Rachaad White,WSH,RB,0,0,0,566,5,40,266,2
+96,J.K. Dobbins,DEN,RB,0,0,0,958,7,21,132,0
+97,Kyle Monangai,CHI,RB,0,0,0,811,6,26,215,1
+98,Travis Kelce,KC,TE,0,0,0,0,0,74,770,4
+99,Matthew Golden,GB,WR,0,0,0,24,0,68,886,5
+100,Chris Godwin Jr.,TB,WR,0,0,0,0,0,60,700,4
+101,Jordan Addison,MIN,WR,0,0,0,15,0,61,767,5
+102,Josh Downs,IND,WR,0,0,0,11,0,70,695,3
