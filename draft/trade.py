@@ -43,6 +43,7 @@ from scipy.stats import norm
 sys.path.insert(0, "draft")
 from vbd import LEAGUE
 from assistant import match
+import consensus as C
 
 POS = ["QB", "RB", "WR", "TE"]
 FLEX = list(LEAGUE["flex"])
@@ -67,7 +68,7 @@ def sd_of(pos, mean):
 
 # ---------------------------------------------------------------- inputs
 
-def load_values(season):
+def load_values(season, source="consensus"):
     """Per player: points per game when active, and share of games he's active for."""
     ros = f"data/ros_{season}.parquet"
     if os.path.exists(ros):
@@ -85,6 +86,21 @@ def load_values(season):
         v["ppg"] = b.proj_ppg
         v["avail"] = b.proj_games / 17
     v["avail"] = v.avail.clip(0.3, 0.98)
+
+    # Points per game from consensus rest-of-season ranks where consensus has one:
+    # consensus out-forecasts our model for season totals and single weeks alike (see
+    # "Does it win leagues?" in the README). Our model still supplies availability, and
+    # the rate for anyone consensus doesn't rank.
+    if source == "consensus":
+        try:
+            _, r = C.latest("ros", season)
+            ppg = pd.Series(C.rank_points(C.weekly_curve(), r.pos, r["rank"]),
+                            index=r.player_id.values)
+            ppg = ppg[~ppg.index.duplicated()]
+            has = v.index.isin(ppg.index)
+            v.loc[has, "ppg"] = ppg.reindex(v.index[has]).values
+        except (FileNotFoundError, ValueError) as e:
+            print(f"  ! consensus values unavailable ({e}); using the model's")
 
     players = pd.read_parquet("data/players.parquet").drop_duplicates("gsis_id").set_index("gsis_id")
     v["team"] = players.latest_team.reindex(v.index)
@@ -351,9 +367,11 @@ def main():
     ap.add_argument("--get", default="")
     ap.add_argument("--suggest", action="store_true")
     ap.add_argument("--sims", type=int, default=4000)
+    ap.add_argument("--values", choices=["consensus", "model"], default="consensus",
+                    help="points per game from consensus ROS ranks (default) or the model")
     a = ap.parse_args()
 
-    v = load_values(a.season)
+    v = load_values(a.season, a.values)
     if a.league:
         lg = json.load(open(a.league))
         teams = {t: resolve(v, r) for t, r in lg["teams"].items()}

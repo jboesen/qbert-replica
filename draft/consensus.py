@@ -67,6 +67,42 @@ def positional(ecr, kind):
     return ecr[m]
 
 
+def weekly_curve(seasons=range(2020, 2026)):
+    """Weekly consensus rank -> the mean PPR players at that rank scored that week, per
+    position, smoothed and non-increasing. It puts ranks from different positions on
+    one scale, so a WR2 and an RB3 can be compared for the flex."""
+    w = pd.read_parquet("data/ecr_weekly.parquet")
+    w = w[w.season.isin(seasons)]
+    st = pd.concat([pd.read_parquet(f"data/stats/w{y}.parquet") for y in seasons])
+    st = st[st.season_type == "REG"][["player_id", "season", "week", "fantasy_points_ppr"]]
+    m = w.merge(st, on=["player_id", "season", "week"], how="left")
+    m["fantasy_points_ppr"] = m.fantasy_points_ppr.fillna(0.0)
+    m["rank"] = m.groupby(["season", "week", "pos"]).ecr.rank(method="first")
+    out = {}
+    for p, g in m.groupby("pos"):
+        by = g.groupby("rank").fantasy_points_ppr.mean().reindex(range(1, 151))
+        by = by.interpolate().ffill().bfill().rolling(5, center=True, min_periods=1).mean()
+        out[p] = np.minimum.accumulate(by.values)
+    return out
+
+
+def rank_points(crv, pos, rank):
+    r = np.clip(np.asarray(rank, float), 1, 150).astype(int) - 1
+    return np.array([crv[p][i] for p, i in zip(pos, r)])
+
+
+def latest(kind, season):
+    """The most recent 'weekly' or 'ros' ranks for a season: (week, rows)."""
+    x = pd.read_parquet(f"data/ecr_{kind}.parquet")
+    x = x[x.season == season]
+    if not len(x):
+        raise ValueError(f"no {kind} consensus for {season}; run draft/consensus.py")
+    wk = int(x.week.max())
+    x = x[x.week == wk].copy()
+    x["rank"] = x.groupby("pos").ecr.rank(method="first")
+    return wk, x
+
+
 def main():
     ecr = fetch()
     g = pd.read_csv("data/games.csv")

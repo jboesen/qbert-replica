@@ -84,6 +84,22 @@ Lineups are consensus (weekly ECR) for every arm. Only the test seat's draft dif
   percentiles (`numpy.quantile`, default linear interpolation). The interval is
   reported; the keep rule above decides.
 
+## Result (added after the single run; the spec above is unchanged)
+
+Both arms fail the rule in both designs, so neither is kept. Changes against the exact
+consensus draft, consensus lineups, 90% season-cluster intervals:
+
+| arm | opponents | title odds | all-play | all-play by season 2021–25 |
+|---|---|---|---|---|
+| market | noise 1 | −5.5 pp [−11.5, +0.1] | −6.4 pp [−11.8, −1.4] | −19.6 −5.7 −0.0 −0.2 −6.4 |
+| market_stack | noise 1 | +1.2 pp [−5.4, +7.5] | −2.2 pp [−6.2, +0.7] | −11.3 −1.0 +1.1 +1.6 −1.3 |
+| market | noise 0 | −1.5 pp [−5.7, +3.6] | −1.8 pp [−7.4, +3.4] | −15.4 +4.0 +6.5 −1.4 −2.5 |
+| market_stack | noise 0 | +4.6 pp [−2.6, +11.7] | +0.7 pp [−4.7, +5.1] | −11.7 +4.2 +4.4 −0.6 +7.3 |
+
+2021 is strongly negative for both arms, and it's the only season whose curve and
+weights come from a single prior season (2020). That's a hypothesis for a new
+preregistration, not a reason to reread this one.
+
 ## Known limits
 
 - The plan ignores bye weeks and doesn't remove its own earlier picks from later

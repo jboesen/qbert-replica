@@ -199,6 +199,25 @@ with the schedule alone, so no title effect here is precise. That's why all-play
 decides and title odds are only the headline. The opponents are synthetic (consensus
 plus noise, not real draft behaviour), and there are no waivers or trades.
 
+**Consensus also out-forecasts the projection.** On 2023–25, over the draftable pool
+with busts counted, preseason consensus beats our season projection at every position
+(correlation QB .39 vs .30, RB .69 vs .66, WR .64 vs .57, TE .51 vs .41). A weighted stack
+of the two (`stack.py`, fit on 2020–22) only ties consensus. Consensus already has what
+the model has, plus news, depth charts and team context.
+
+**Planning around the room doesn't help either.** The last idea was a draft that keeps
+consensus values but plans picks around when consensus managers will take each player
+(Fry–Lundberg–Ohlmann against predicted availability). It was preregistered in
+`prereg.md`, frozen and committed before it ran, and run once. Both versions fail the
+rule under both opponent designs (all-play −6.4 to +0.7 points against exact
+consensus). The details are in that file.
+
+So the tools now build on consensus. `lineup.py` sets start/sit from weekly consensus
+ranks, and `trade.py` values players by consensus rest-of-season ranks (`--values model`
+for the old behaviour). Our model supplies what consensus doesn't: availability,
+injury runs and byes in the trade simulation. The draft advice is to draft by consensus
+and not reach.
+
 ## Using it
 
 ```bash
@@ -211,6 +230,8 @@ plus noise, not real draft behaviour), and there are no waivers or trades.
 .venv/bin/python draft/board.py 2026         # board for the upcoming season
 .venv/bin/python draft/consensus.py          # FantasyPros consensus ranks, as of each decision
 .venv/bin/python draft/league_backtest.py    # does it win leagues vs consensus? (--noise 0: exact opponents)
+.venv/bin/python draft/stack.py              # model + consensus season stack, fit 2020-22, checked 2023-25
+.venv/bin/python draft/lineup.py --mine "..." # this week's start/sit, by consensus
 ```
 
 Then on draft day:
@@ -301,6 +322,10 @@ his margin over whoever would start instead, down to the waiver wire.
 ```
 
 `league.json` is `{"me": "John", "teams": {"John": ["name", ...], "Alex": [...], ...}}`.
+
+Points per game come from consensus rest-of-season ranks by default (run
+`draft/consensus.py` for fresh ones). The model's availability and injury rates still
+drive the simulation. `--values model` uses the model's rates instead.
 
 ```
 you give: Ja'Marr Chase
