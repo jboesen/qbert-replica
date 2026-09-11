@@ -254,7 +254,9 @@ least.
 
 `--suggest` enumerates 1-for-1, 2-for-1, 1-for-2 and 2-for-2 deals with every other team,
 keeps those where both sides gain wins, and re-runs the best with more simulations.
-Trades like that exist whenever one roster has depth where the other has a hole.
+Trades like that exist whenever one roster has depth where the other has a hole. A search
+across a whole 12-team league takes about three minutes; `--with` narrows it to one team
+(about 15 seconds).
 
 Does it work? `trade_backtest.py` drafts twelve rosters from the preseason board in each
 holdout season, makes 400 random trades between them, and values each at week 1. The
