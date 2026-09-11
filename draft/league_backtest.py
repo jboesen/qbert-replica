@@ -43,7 +43,9 @@ sys.path.insert(0, "draft")
 from vbd import LEAGUE, add_vbd
 from draft_dp import BENCH_VALUE, snake_picks
 import board as B
+import consensus as C
 import stack as K
+import usage as U
 import weekly as W
 
 POS = ["QB", "RB", "WR", "TE"]
@@ -64,6 +66,11 @@ TITLE_GUARD = -0.010
 # Opponents' deviation from consensus, in units of the experts' own spread. 1 is the
 # main design; 0 is the sensitivity check where every opponent follows consensus exactly.
 NOISE = 1.0
+# prereg_adp.md: the draft-market arms, scored with consensus lineups only, and the most
+# consensus-implied season value adp_gap will give up to take a player the market won't
+# leave it. Declared before the run, not tuned.
+ADP_ARMS = ("adp", "adp_gap")
+ADP_DELTA = 10.0
 
 
 # ---------------------------------------------------------------- inputs per season
@@ -218,6 +225,20 @@ class Season:
         # Who the opponents are predicted to take next: the consensus overall order.
         self.market_key = np.where(np.isfinite(self.ecr_mean), self.ecr_mean, 1e6)
 
+        # Draft-market prices (prereg_adp.md): the last snapshot of real drafts before
+        # the opener, on a 12-team board, so an ADP is comparable to a pick number here.
+        mkt = pd.read_parquet("data/adp_ffc.parquet")
+        mkt = mkt[(mkt.season == y) & mkt.player_id.notna()]
+        mkt = mkt.drop_duplicates("player_id").set_index("player_id")
+        self.adp = mkt.adp.reindex(ids).values
+        # ADP order first, then everyone else by consensus. The tail is load-bearing: the
+        # skill-position ADP list runs 146-206 deep by season and a 14-round draft takes
+        # 168 picks, so in 2022 it is exhausted before the draft ends.
+        adp_key = np.where(np.isfinite(self.adp), self.adp, 1e6)
+        order = np.lexsort((self.market_key, adp_key))
+        self.adp_order = [i for i in order
+                          if np.isfinite(self.adp[i]) or np.isfinite(self.ecr_mean[i])]
+
     def _vbd(self, pts, ids):
         b = pd.DataFrame({"position": self.pos, "proj_points": pts.reindex(ids).values},
                          index=ids)
@@ -308,6 +329,31 @@ def market_policy(S, seat, value):
     return pick
 
 
+def adp_gap_policy(S, seat, value, delta=ADP_DELTA):
+    """prereg_adp.md: value players by consensus, but pay market prices. Never spend a
+    pick on a player the market says will still be there next time, when someone the
+    market will take is worth nearly as much. A player with no ADP counts as safe:
+    undrafted in a 12-team market means he lasts."""
+    mine = snake_picks(seat, TEAMS, ROUNDS)
+
+    def pick(taken, c, rnd, pick_no):
+        avail = np.where(~taken & np.isfinite(value))[0]
+        ok = avail[[allowed(S.pos[x], c, rnd) for x in avail]] if len(avail) else avail
+        if not len(ok):
+            return None
+        best = ok[np.argmax(value[ok])]
+        later = [p for p in mine if p > pick_no]
+        if not later:                                   # last pick: nothing to wait for
+            return best
+        unsafe = ok[np.nan_to_num(S.adp[ok], nan=1e6) < later[0]]
+        if not len(unsafe) or best in unsafe:
+            return best
+        cand = unsafe[np.argmax(value[unsafe])]
+        return cand if value[cand] >= value[best] - delta else best
+
+    return pick
+
+
 def draft(S, orders):
     """Snake draft; each seat takes the first player on its own list it may take, or
     asks its policy, when the seat's entry is a function instead of a list."""
@@ -346,25 +392,27 @@ def draft(S, orders):
     return rosters
 
 
-def lineup_points(S, roster, value):
-    """Actual points each week from the lineup a policy sets on its values."""
+def week_points(S, roster, value, w):
+    """Actual points in week w from the lineup a policy sets on its values."""
     r = np.array(roster)
     pos = S.pos[r]
-    out = np.zeros(WEEKS)
-    for w in range(WEEKS):
-        v = np.where(S.elig[r, w], value[r, w], -np.inf)
-        used = np.zeros(len(r), bool)
-        total = 0.0
-        for p, k in SLOTS.items():
-            cand = np.where((pos == p) & ~used & np.isfinite(v))[0]
-            pick = cand[np.argsort(-v[cand])][:k]
-            used[pick] = True
-            total += S.actual[r[pick], w].sum()
-        cand = np.where(np.isin(pos, FLEX) & ~used & np.isfinite(v))[0]
-        if len(cand):
-            total += S.actual[r[cand[np.argmax(v[cand])]], w]
-        out[w] = total
-    return out
+    v = np.where(S.elig[r, w], value[r, w], -np.inf)
+    used = np.zeros(len(r), bool)
+    total = 0.0
+    for p, k in SLOTS.items():
+        cand = np.where((pos == p) & ~used & np.isfinite(v))[0]
+        pick = cand[np.argsort(-v[cand])][:k]
+        used[pick] = True
+        total += S.actual[r[pick], w].sum()
+    cand = np.where(np.isin(pos, FLEX) & ~used & np.isfinite(v))[0]
+    if len(cand):
+        total += S.actual[r[cand[np.argmax(v[cand])]], w]
+    return total
+
+
+def lineup_points(S, roster, value):
+    """Actual points each week from the lineup a policy sets on its values."""
+    return np.array([week_points(S, roster, value, w) for w in range(WEEKS)])
 
 
 def schedules(rng, n):
@@ -409,6 +457,251 @@ def all_play(scores, t):
     return ((wk[t] > np.delete(wk, t, 0)).sum() / ((TEAMS - 1) * REG))
 
 
+# ---------------------------------------------------------------- waivers
+
+# Waiver rules, applied identically to every seat (prereg_waivers.md): one add/drop a
+# week, roster size fixed at 14, no FAAB, no trades, no IR slot. A team may never cut
+# below a legal starting lineup, so the wire cannot leave it unable to field one.
+ROSTER_MIN = SLOTS
+FIRST_WAIVER = 2                  # the first decision is made once week 1 has been played
+
+
+def waiver_values(S, y, crv, fits):
+    """Rest-of-season value per player at each decision point, for both waiver policies.
+
+    Both policies price a player through the same consensus rank curve, so the only
+    thing that differs between them is the order. The usage signal enters as an implied
+    rank: recent role puts a player at some percentile of his position, that percentile
+    is read on the consensus rank scale, and he is valued at the better of that and his
+    consensus rank. Pricing it any other way would be a level shift rather than a
+    disagreement, since the signal is fit on players who are playing and consensus
+    ranks everyone. Consensus being slow on role is the whole hypothesis, so the signal
+    may promote a player but never demote one.
+    """
+    n = len(S.ids)
+    ix = {p: i for i, p in enumerate(S.ids)}
+    ros = pd.read_parquet("data/ecr_ros.parquet")
+    ros = ros[ros.season == y]
+    pre = pd.read_parquet("data/ecr_preseason.parquet")
+    pre = pre[pre.season == y]
+    uv = U.season_values(y, fits)
+    cons = np.full((n, WEEKS), np.nan)
+    test = np.full((n, WEEKS), np.nan)
+    for w in range(FIRST_WAIVER, WEEKS + 1):
+        # The latest rest-of-season scrape strictly before the upcoming week; before the
+        # first one of the season, the preseason positional ranks stand in.
+        earlier = ros[ros.week < w]
+        src = earlier[earlier.week == earlier.week.max()] if len(earlier) else pre
+        src = src.assign(rank=src.groupby("pos").ecr.rank(method="first"))
+        worst = src.groupby("pos")["rank"].max().to_dict()
+        c_rank = np.full(n, np.nan)
+        for p, r in zip(src.player_id, src["rank"]):
+            if p in ix:
+                c_rank[ix[p]] = r
+        u = np.full(n, np.nan)
+        this = uv[uv.week == w]
+        for p, v in zip(this.player_id, this.value):
+            if p in ix:
+                u[ix[p]] = v
+
+        t_rank = np.full(n, np.nan)
+        for p in POS:
+            at = S.pos == p
+            deep = int((at & np.isfinite(c_rank)).sum())    # how far down consensus ranks
+            # A player consensus does not rank sits one past the last player it does.
+            c_rank[at & np.isnan(c_rank)] = worst.get(p, 100) + 1
+            t_rank[at] = c_rank[at]
+            seen = at & np.isfinite(u)
+            if not seen.sum() or not deep:
+                continue
+            order = np.argsort(-u[seen], kind="stable")
+            r = np.empty(int(seen.sum()))
+            r[order] = np.arange(1, seen.sum() + 1)
+            # The signal ranks only players who are playing; consensus ranks a deeper
+            # pool. Stretching by that ratio makes the two percentiles comparable.
+            r *= deep / seen.sum()
+            t_rank[seen] = np.minimum(c_rank[seen], r)
+        for arr, rk in ((cons, c_rank), (test, t_rank)):
+            pts = np.full(n, np.nan)
+            for p in POS:
+                at = S.pos == p
+                pts[at] = C.rank_points(crv, S.pos[at], np.clip(rk[at], 1, 150))
+            arr[:, w - 1] = over_replacement(S, pts)
+    return cons, test
+
+
+def over_replacement(S, pts):
+    """Price a week's projected points against the replacement at each position.
+
+    Raw points cannot be compared across positions on a waiver wire any more than on
+    draft day: a QB15 outscores a WR40 every week, so a policy comparing points takes a
+    quarterback every time and ends the season starting four of them. In a one-QB league
+    the second one is worth nothing, which is exactly what value over replacement says.
+    """
+    b = pd.DataFrame({"position": S.pos, "proj_points": pts})
+    b = b[b.position.isin(POS) & b.proj_points.notna()]
+    b, _, _ = add_vbd(b)
+    out = np.full(len(S.pos), np.nan)
+    out[b.index.values] = b.vbd.values
+    return out
+
+
+def priority(scores, upto):
+    """Waiver order: worst record first, ties by points for.
+
+    Record here is all-play through the weeks already played, not head-to-head. The
+    harness scores every roster against twenty schedule draws, and a schedule-dependent
+    order would mean re-running the wire once per draw, with the roster a team ends up
+    holding decided partly by schedule luck. All-play is the same standings idea with
+    the luck taken out.
+    """
+    s = scores[:, :upto + 1]
+    rate = [(s[t] > np.delete(s, t, 0)).sum() for t in range(TEAMS)]
+    pf = s.sum(1)
+    return sorted(range(TEAMS), key=lambda t: (rate[t], pf[t]))
+
+
+def waiver_week(S, rosters, values, order, w):
+    """One waiver round before week w. Teams act in priority order on their own policy,
+    so a team can lose the player it wanted to one picking ahead of it."""
+    on_roster = np.zeros(len(S.ids), bool)
+    for r in rosters:
+        on_roster[r] = True
+    moves = np.zeros(TEAMS, int)
+    for t in order:
+        val = values[t][:, w - 1]
+        free = np.where(~on_roster & np.isfinite(val))[0]
+        if not len(free):
+            continue
+        add = free[int(np.argmax(val[free]))]
+        held = np.array(rosters[t])
+        counts = {p: int((S.pos[held] == p).sum()) for p in POS}
+        can_cut = np.array([i for i in held
+                            if counts[S.pos[i]] > ROSTER_MIN.get(S.pos[i], 0)])
+        if not len(can_cut):
+            continue
+        # A player the policy cannot value at all is the first one cut.
+        vd = np.where(np.isfinite(val[can_cut]), val[can_cut], -np.inf)
+        drop = int(can_cut[int(np.argmin(vd))])
+        if val[add] > vd.min():
+            rosters[t] = [i for i in rosters[t] if i != drop] + [int(add)]
+            on_roster[add], on_roster[drop] = True, False
+            moves[t] += 1
+    return moves
+
+
+def simulate(S, drafted, values, who):
+    """Play a season week by week, running the wire between weeks.
+
+    Waiver priority depends on the standings so far, so the order cannot be known in
+    advance: scoring and transacting have to interleave.
+    """
+    rosters = [list(r) for r in drafted]
+    scores = np.zeros((TEAMS, WEEKS))
+    moves = np.zeros(TEAMS, int)
+    for w in range(WEEKS):
+        for t in range(TEAMS):
+            scores[t, w] = week_points(S, rosters[t], S.ecr_val, w)
+        if w + 1 < WEEKS and who:
+            order = [t for t in priority(scores, w) if t in who]
+            moves += waiver_week(S, rosters, values, order, w + 2)
+    return scores, moves, rosters
+
+
+# ---------------------------------------------------------------- the waiver experiment
+
+def run_waivers():
+    curves = rank_curve()
+    wk_proj = weekly_projections()
+    rows = []
+    for y in SEASONS:
+        S = Season(y, wk_proj, curves)
+        # Both fits see only seasons before y, so nothing is fit on the season scored.
+        crv = C.weekly_curve(range(2020, y))
+        fits = U.fit_before(y)
+        cons_val, test_val = waiver_values(S, y, crv, fits)
+        every = set(range(TEAMS))
+        for lg in range(LEAGUES):
+            # The same draws in the same order as the main harness, so the drafts match.
+            rng = np.random.default_rng([y, lg])
+            noise = rng.standard_normal((TEAMS + 1, len(S.ids)))
+            ecr_orders = []
+            for k in range(TEAMS + 1):
+                score = S.ecr_mean + NOISE * S.ecr_sd * noise[k]
+                ok = np.where(np.isfinite(score))[0]
+                ecr_orders.append(list(ok[np.argsort(score[ok])]))
+            scheds = schedules(rng, SCHEDULES)
+            for seat in range(TEAMS):
+                orders = list(ecr_orders[:TEAMS])
+                orders[seat] = S.exact_order          # exact consensus draft in every arm
+                drafted = draft(S, orders)
+                base = [cons_val] * TEAMS
+                mine = list(base)
+                mine[seat] = test_val
+                for arm, v, who in (("none", base, set()), ("cons", base, every),
+                                    ("usage", mine, every), ("solo", base, {seat})):
+                    sc, moves, _ = simulate(S, drafted, v, who)
+                    res = [season_outcome(sc, s) for s in scheds]
+                    rows.append({
+                        "season": y, "league": lg, "seat": seat, "arm": arm,
+                        "title": np.mean([r[2][seat] for r in res]),
+                        "playoff": np.mean([r[1][seat] for r in res]),
+                        "wins": np.mean([r[0][seat] for r in res]),
+                        "all_play": all_play(sc, seat),
+                        "pts_reg": sc[seat, :REG].sum(),
+                        "pts_playoff": sc[seat, REG:].sum(),
+                        "moves": moves[seat],
+                    })
+            print(f"{y} league {lg + 1}/{LEAGUES}", flush=True)
+    return pd.DataFrame(rows)
+
+
+def paired(d, arm, ref, label):
+    """Paired change of one arm against another, in the same league, seat and schedules."""
+    key = ["season", "league", "seat"]
+    m = ["title", "playoff", "wins", "all_play", "pts_reg", "pts_playoff"]
+    a = d[d.arm == arm].set_index(key)[m]
+    b = d[d.arm == ref].set_index(key)[m]
+    diff = a - b.loc[a.index]
+    by = diff.groupby("season").all_play.mean()
+    rng = np.random.default_rng(1)
+    seasons = diff.groupby("season").mean()
+    boot = pd.DataFrame([seasons.loc[rng.choice(seasons.index, len(seasons))].mean()
+                         for _ in range(2000)])
+    lo, hi = boot.quantile(.05), boot.quantile(.95)
+    keep = (diff.all_play.mean() > 0 and (by > 0).sum() >= 4
+            and diff.title.mean() >= TITLE_GUARD)
+    print(f"  {label:26s} title {100 * diff.title.mean():+.1f} pp "
+          f"[{100 * lo.title:+.1f}, {100 * hi.title:+.1f}]   all-play "
+          f"{100 * diff.all_play.mean():+.1f} pp [{100 * lo.all_play:+.1f}, "
+          f"{100 * hi.all_play:+.1f}]  by season "
+          + " ".join(f"{100 * v:+.1f}" for v in by)
+          + f"   reg pts {diff.pts_reg.mean():+.0f}")
+    return keep
+
+
+def report_waivers(d):
+    print("\n=== waivers: usage-based breakout detector vs consensus waivers ===")
+    print("12-team PPR leagues on 2021-25, exact-consensus draft and consensus lineups in "
+          "every arm;\none add/drop per team per week, priority worst record first\n")
+    print(f"{'arm':6s} {'title':>7s} {'playoff':>8s} {'wins':>6s} {'all-play':>9s} "
+          f"{'reg pts':>8s} {'po pts':>7s} {'adds':>6s}")
+    for arm, g in d.groupby("arm", sort=False):
+        print(f"{arm:6s} {100 * g.title.mean():6.1f}% {100 * g.playoff.mean():7.1f}% "
+              f"{g.wins.mean():6.2f} {100 * g.all_play.mean():8.1f}% "
+              f"{g.pts_reg.mean():8.0f} {g.pts_playoff.mean():7.0f} {g.moves.mean():6.2f}")
+
+    print("\npreregistered test (prereg_waivers.md), season-cluster bootstrap 90% interval:")
+    keep = paired(d, "usage", "cons", "usage minus consensus")
+    print(f"  -> {'passes this design' if keep else 'fails this design'}")
+    print("\ndiagnostics: how much the wire moves anything at all")
+    paired(d, "cons", "none", "everyone drafts, no wire")
+    paired(d, "solo", "none", "only my seat works the wire")
+    print("('cons minus none' is close to zero by construction: when every team gets the "
+          "same\n lever, the relative standings need not move. 'solo minus none' is the "
+          "lever's size.)")
+
+
 # ---------------------------------------------------------------- the experiment
 
 def run():
@@ -435,13 +728,19 @@ def run():
                 own = {"model": S.model_order, "ecr": ecr_orders[TEAMS], "blend": S.blend_order,
                        "exact": S.exact_order,
                        "market": market_policy(S, seat, S.cons_vbd),
-                       "market_stack": market_policy(S, seat, S.stack_vbd)}
-                for d_arm in ("model", "ecr", "blend", "exact", "market", "market_stack"):
+                       "market_stack": market_policy(S, seat, S.stack_vbd),
+                       "adp": S.adp_order,
+                       "adp_gap": adp_gap_policy(S, seat, S.cons_vbd)}
+                for d_arm in ("model", "ecr", "blend", "exact", "market", "market_stack",
+                              "adp", "adp_gap"):
                     orders = list(ecr_orders[:TEAMS])
                     orders[seat] = own[d_arm]
                     rosters = draft(S, orders)
                     base = np.array([lineup_points(S, r, S.ecr_val) for r in rosters])
-                    for l_arm in ("model", "ecr", "blend", "hindsight"):
+                    # The market arms are a draft test, so only consensus lineups.
+                    lineups = ("ecr",) if d_arm in ADP_ARMS else (
+                        "model", "ecr", "blend", "hindsight")
+                    for l_arm in lineups:
                         sc = base.copy()
                         sc[seat] = lineup_points(S, rosters[seat], vals[l_arm])
                         res = [season_outcome(sc, s) for s in scheds]
@@ -511,25 +810,32 @@ def report(d):
               f"{100 * diff.playoff.mean():+.1f} pp")
 
     # The preregistered test (prereg.md): market-aware drafts against exact consensus.
-    print("\npreregistered (prereg.md): draft minus exact-consensus draft, consensus lineups "
-          "(season-cluster bootstrap 90% interval)")
     b = d[(d.draft == "exact") & (d.lineup == "ecr")].set_index(key)[m]
-    for arm in ("market", "market_stack"):
-        rng = np.random.default_rng(1)                   # per arm, as prereg.md declares
-        a = d[(d.draft == arm) & (d.lineup == "ecr")].set_index(key)[m]
-        diff = a - b.loc[a.index]
-        by = diff.groupby("season").all_play.mean()
-        seasons = diff.groupby("season").mean()
-        boot = pd.DataFrame([seasons.loc[rng.choice(seasons.index, len(seasons))].mean()
-                             for _ in range(2000)])
-        lo, hi = boot.quantile(.05), boot.quantile(.95)
-        keep = diff.all_play.mean() > 0 and (by > 0).sum() >= 4 and diff.title.mean() >= TITLE_GUARD
-        print(f"  {arm:13s} title {100 * diff.title.mean():+.1f} pp [{100 * lo.title:+.1f}, "
-              f"{100 * hi.title:+.1f}]   all-play {100 * diff.all_play.mean():+.1f} pp "
-              f"[{100 * lo.all_play:+.1f}, {100 * hi.all_play:+.1f}]  by season "
-              + " ".join(f"{100 * v:+.1f}" for v in by)
-              + f"   playoff {100 * diff.playoff.mean():+.1f} pp   -> "
-              + ("passes this design" if keep else "fails this design"))
+    for spec, arms in (("prereg.md", ("market", "market_stack")),
+                       ("prereg_adp.md", ADP_ARMS)):
+        arms = [a for a in arms if ((d.draft == a) & (d.lineup == "ecr")).any()]
+        if not arms:
+            continue
+        print(f"\npreregistered ({spec}): draft minus exact-consensus draft, consensus "
+              "lineups (season-cluster bootstrap 90% interval)")
+        for arm in arms:
+            rng = np.random.default_rng(1)               # per arm, as the spec declares
+            a = d[(d.draft == arm) & (d.lineup == "ecr")].set_index(key)[m]
+            diff = a - b.loc[a.index]
+            by = diff.groupby("season").all_play.mean()
+            seasons = diff.groupby("season").mean()
+            boot = pd.DataFrame([seasons.loc[rng.choice(seasons.index, len(seasons))].mean()
+                                 for _ in range(2000)])
+            lo, hi = boot.quantile(.05), boot.quantile(.95)
+            keep = (diff.all_play.mean() > 0 and (by > 0).sum() >= 4
+                    and diff.title.mean() >= TITLE_GUARD)
+            print(f"  {arm:13s} title {100 * diff.title.mean():+.1f} pp "
+                  f"[{100 * lo.title:+.1f}, {100 * hi.title:+.1f}]   all-play "
+                  f"{100 * diff.all_play.mean():+.1f} pp [{100 * lo.all_play:+.1f}, "
+                  f"{100 * hi.all_play:+.1f}]  by season "
+                  + " ".join(f"{100 * v:+.1f}" for v in by)
+                  + f"   playoff {100 * diff.playoff.mean():+.1f} pp   -> "
+                  + ("passes this design" if keep else "fails this design"))
 
     print(f"\nschedule sensitivity: for a fixed roster and lineups, the title rate moves by "
           f"{100 * d.title_sched_sd.mean():.1f} pp (sd) across schedule draws alone")
@@ -548,8 +854,19 @@ def report(d):
 if __name__ == "__main__":
     if "--noise" in sys.argv:
         NOISE = float(sys.argv[sys.argv.index("--noise") + 1])
+    if "--leagues" in sys.argv:      # mechanics checks only; a real run uses the default
+        LEAGUES = int(sys.argv[sys.argv.index("--leagues") + 1])
+    if "--waivers" in sys.argv:
+        d = run_waivers()
+        d.to_parquet(f"data/league_waivers_noise{NOISE:g}.parquet")
+        print(f"\nopponent noise: {NOISE:g} x ECR sd")
+        report_waivers(d)
+        sys.exit()
     d = run()
-    d.to_parquet("data/league_backtest.parquet" if NOISE == 1.0 else
-                 f"data/league_backtest_noise{NOISE:g}.parquet")
+    path = ("data/league_backtest.parquet" if NOISE == 1.0 else
+            f"data/league_backtest_noise{NOISE:g}.parquet")
+    if LEAGUES != 20:                # never overwrite a real result with a short check
+        path = f"data/league_backtest_check{LEAGUES}_noise{NOISE:g}.parquet"
+    d.to_parquet(path)
     print(f"\nopponent noise: {NOISE:g} x ECR sd")
     report(d)

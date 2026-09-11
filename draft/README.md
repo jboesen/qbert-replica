@@ -212,6 +212,28 @@ consensus values but plans picks around when consensus managers will take each p
 rule under both opponent designs (all-play −6.4 to +0.7 points against exact
 consensus). The details are in that file.
 
+**Real draft-market prices don't help either.** ADP (average draft position, free from
+Fantasy Football Calculator) is a different kind of signal from consensus rankings, a
+price rather than an opinion, but it correlates slightly worse with actual points (.509
+vs .520 overall, 2021–25, ECR ahead at every position). Drafting straight by ADP, and a
+policy that pays ADP prices for consensus-implied value, both fail clearly and in both
+opponent designs (`prereg_adp.md`): title odds down 5–7 points, all-play down, negative
+in nearly every season. The two lists agree 95–98% of the time, so a tie was the honest
+prior; it came in worse than a tie.
+
+**Waivers are a real lever, but reading usage doesn't beat reading consensus's own
+rankings on the wire.** Nothing had tested in-season transactions before; adding a
+weekly add/drop (worst record first, one move a team) to the harness shows the wire is
+worth something on its own: a team that works it alone, while everyone else's roster is
+frozen, gains 3–5 points of all-play and 6–13 points of title odds over a league where
+nobody uses it (`prereg_waivers.md`). But a signal built to catch role changes early
+(recent target and carry share, red zone work, an injury-vacated starting job, all fit
+on seasons before the one it's scored on) loses to a seat that just adds whoever
+consensus rest-of-season ranks highest — by 3–5 points of all-play, in both opponent
+designs, in most seasons. It makes more moves than consensus does (14–15 a season
+against 10–12), which reads as chasing short usage spikes that don't hold up rather
+than catching durable role changes. Consensus is already good at this particular job.
+
 So the tools now build on consensus. `lineup.py` sets start/sit from weekly consensus
 ranks, and `trade.py` values players by consensus rest-of-season ranks (`--values model`
 for the old behaviour). Our model supplies what consensus doesn't: availability,
@@ -230,7 +252,9 @@ and not reach.
 .venv/bin/python draft/board.py 2026         # board for the upcoming season
 .venv/bin/python draft/consensus.py          # FantasyPros consensus ranks, as of each decision
 .venv/bin/python draft/league_backtest.py    # does it win leagues vs consensus? (--noise 0: exact opponents)
+.venv/bin/python draft/league_backtest.py --waivers   # does usage beat consensus on the wire? (prereg_waivers.md)
 .venv/bin/python draft/stack.py              # model + consensus season stack, fit 2020-22, checked 2023-25
+.venv/bin/python draft/adp.py                # historical ADP, for the market-signal test (prereg_adp.md)
 .venv/bin/python draft/lineup.py --mine "..." # this week's start/sit, by consensus
 ```
 
