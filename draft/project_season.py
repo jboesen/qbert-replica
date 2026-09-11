@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
+import role
+
 RECENCY = 0.65          # weight decay per season going back
 POSITIONS = ["QB", "RB", "WR", "TE"]
 
@@ -194,6 +196,12 @@ def fit_predict(s, train_mask):
             sm.add_constant(games_features(x), has_constant="add"))
     s["proj_games"] = s.proj_games.clip(1, s.season_games)
     s["proj_points"] = s.proj_ppg * s.proj_games
+
+    # History says how good he is; the week-1 depth chart says whether he'll play.
+    # Re-weight by role (draft/role.py), fit on the training seasons only.
+    s = role.attach(s)
+    s = role.apply(s, role.fit(s, train_mask))
+    s.attrs["alpha"] = alpha                # the merge in attach drops attrs
     return s, ks
 
 

@@ -29,7 +29,8 @@ Holdout 2021–25, 2,014 player-seasons, projecting full-season PPR points:
 
 | model | RMSE | MAE | corr |
 |---|---|---|---|
-| hierarchical projection | **60.2** | **44.9** | **0.756** |
+| hierarchical projection + depth role | **54.7** | **40.2** | **0.800** |
+| hierarchical projection alone | 60.2 | 44.9 | 0.756 |
 | last season's total | 66.9 | 47.2 | 0.736 |
 | own ppg × season games (no shrinkage) | 78.6 | 59.6 | 0.723 |
 | position mean | 87.4 | 70.8 | 0.276 |
@@ -59,6 +60,32 @@ by assuming the league consumes the board in a known order. That reduction is wh
 implemented — state is (next pick, unfilled starting slots), and the transition inherits
 the best player left at each position at each future pick.
 
+## 4. Depth-chart role
+
+`depth_role.py`, `role.py`. The pooled projection knows how good a player has been, not
+whether he'll be on the field. A backup quarterback with a good career projected like a
+starter, and a receiver who slid to fourth on the chart projected off last year's role.
+The depth chart published before week 1 settles that. It's nflverse's, weekly through
+2024 and dated snapshots from 2025, back to 2012. Each projection is re-weighted by the
+player's slot (starter, second, third or lower, not on the chart), separately for games
+played and for points per game, so the trade simulator can tell "rarely plays" from
+"plays badly". Rookies get their own coefficients: their projection is the
+draft-pedigree prior alone, and that prior undershoots the rookies who win jobs. Fit on
+2012–20, scored on 2021–25, with the chart taken from before each season opened:
+
+| | MAE before → after | corr before → after |
+|---|---|---|
+| QB | 62.7 → **49.0** | 0.746 → **0.830** |
+| RB | 49.2 → **42.7** | 0.735 → **0.778** |
+| WR | 43.6 → **38.0** | 0.789 → **0.805** |
+| TE | 28.7 → **26.0** | 0.790 → **0.806** |
+
+Among fantasy-relevant quarterbacks, correlation goes from 0.41 to 0.59, the largest
+single gain anywhere in the build. Relevant receivers don't move (0.57 → 0.56): a top
+receiver is a starter either way. It also carries into the weekly model, whose
+preseason prior this is: holdout RMSE 6.16 → 6.12, within-week rank 0.597 → 0.607.
+With a role to lean on, rookies make the board, 14 of them in 2026.
+
 ## Does any of it work?
 
 `backtest.py`. Twelve teams, 14-round snake, PPR, holdout seasons 2021–25. Each strategy
@@ -68,40 +95,46 @@ measures roster quality, not in-season management.
 
 | strategy | mean season points | sd |
 |---|---|---|
-| Fry–Lundberg–Ohlmann DP | **1772** | 142 |
-| value-based drafting | 1743 | 200 |
-| prior-year finish (a naive market) | 1683 | 162 |
-| best projected points | 1132 | 164 |
+| Fry–Lundberg–Ohlmann DP | **1825** | 155 |
+| value-based drafting | 1804 | 183 |
+| prior-year finish (a naive market) | 1691 | 192 |
+| best projected points | 1174 | 109 |
 
 Paired within the same league (n=20 leagues):
 
 | DP vs | difference | std error | DP ahead in |
 |---|---|---|---|
-| value-based drafting | +16 | 26 | 70% |
-| prior-year finish | **+87** | 26 | 75% |
-| best projected points | **+627** | 24 | 100% |
+| value-based drafting | +21 | 21 | 65% |
+| prior-year finish | **+134** | 31 | 80% |
+| best projected points | **+651** | 23 | 100% |
+
+(These are with the depth-role projections. Before role, the edge over the market was
++87 ± 26: knowing who starts is worth about 50 points a season on draft day.)
 
 Read honestly:
 
-- **Positional value is everything.** Drafting by raw projected points loses by 627
+- **Positional value is everything.** Drafting by raw projected points loses by 651
   points a season — it takes quarterbacks early and never recovers. This is the whole
   ballgame, and it's a 1970s idea, not a modern one.
-- **The board beats a naive market by ~87 points a season**, about 5%, at roughly 3
+- **The board beats a naive market by ~134 points a season**, about 8%, at over 4
   standard errors. That's a real edge against a league drafting off last year's finish.
-- **The DP paper adds nothing reliable over plain VBD** — +16 ± 26 is noise, though it
-  wins 70% of leagues and cuts the spread of outcomes (sd 142 vs 200). Its value here is
+- **The DP paper adds nothing reliable over plain VBD** — +21 ± 21 is noise, though it
+  wins 65% of leagues and cuts the spread of outcomes (sd 155 vs 183). Its value here is
   consistency, not upside. Replicated faithfully, and honestly not worth much in this
   setting.
 
 A caveat on the market baseline: no free source of historical ADP exists, so the "market"
 is modelled as prior-year fantasy finish. A real league drafting off consensus rankings
-is a tougher opponent than that, so treat +87 as an upper bound.
+is a tougher opponent than that, and one that already knows the depth chart, so treat
++134 as an upper bound.
 
 ## Using it
 
 ```bash
 .venv/bin/python draft/seasons.py            # season table for QB/RB/WR/TE
-.venv/bin/python draft/project_season.py     # projections + holdout validation
+.venv/bin/python draft/depth_role.py         # week-1 depth-chart role, 2012 on
+.venv/bin/python draft/project_season.py     # projections (with role) + holdout validation
+.venv/bin/python draft/role.py               # what the role adjustment buys, on the holdout
 .venv/bin/python draft/vbd.py                # replacement levels and VBD board
 .venv/bin/python draft/backtest.py           # simulate drafts, score the strategies
 .venv/bin/python draft/board.py 2026         # board for the upcoming season
@@ -152,36 +185,113 @@ Holdout 2021–25, 29,376 player-games:
 
 | model | RMSE | MAE | corr | rank within position-week |
 |---|---|---|---|---|
-| weekly model | **6.16** | **4.58** | **0.632** | **0.597** |
-| pooled rate only (no matchup) | 6.20 | 4.66 | 0.629 | 0.594 |
-| season-to-date average | 6.48 | 4.66 | 0.601 | 0.568 |
-| preseason projection | 6.57 | 5.12 | 0.574 | 0.518 |
+| weekly model | **6.12** | **4.53** | **0.639** | **0.607** |
+| pooled rate only (no matchup) | 6.15 | 4.59 | 0.636 | 0.603 |
+| season-to-date average | 6.45 | 4.63 | 0.605 | 0.576 |
+| preseason projection | 6.46 | 4.96 | 0.587 | 0.538 |
 
 Scored only on the fantasy-relevant pool, the way published accuracy studies score
-experts, correlation is QB .24, RB .42, WR .30, TE .21 — around the best public expert
+experts, correlation is QB .24, RB .43, WR .30, TE .20 — around the best public expert
 sources at RB and WR (≈.45 and ≈.30), short of them at QB and TE (≈.30).
 
-- **The in-season update is almost all of it.** The preseason prior is worth only 2–4
+- **The in-season update is almost all of it.** The preseason prior is worth only 3–4
   games of this season's evidence, so the board moves quickly in September.
 - **Matchups and betting lines add little** on top of a well-pooled rate: dropping both
-  costs 0.02 RMSE. Opponent-vs-position is mostly noise, which matches what's been
+  costs 0.03 RMSE. Opponent-vs-position is mostly noise, which matches what's been
   published. Usage and red-zone shares were tested and bought 0.016 more; left out.
 - **Questionable players play 57% of the time** (2016–25 reports against box scores);
   doubtful 1%.
 
-Limits: projections are conditional on playing, and depth charts are still invisible,
-so a backup who won't see the field isn't flagged. The spread is symmetric while real
+Limits: projections are conditional on playing. The preseason prior carries each
+player's week-1 depth slot, but mid-season depth changes are invisible until they show
+up in the box score, so a backup promoted this week isn't flagged. The spread is symmetric while real
 weekly scoring is right-skewed, so `proj_sd` is too wide in the middle (75% of games
 land inside one sd) and too narrow in the upside tail.
 
+### Trades
+
+`trade.py` values a trade by what it does to each side's season, not by the players'
+projections side by side. A player is worth what he adds to the lineup of the team that
+gets him: a third running back counts only in the weeks he'd actually start, and only by
+his margin over whoever would start instead, down to the waiver wire.
+
+```bash
+# a trade someone offered you
+.venv/bin/python draft/trade.py --league league.json --with Alex \
+  --give "Ja'Marr Chase" --get "Christian McCaffrey, Derrick Henry"
+
+# or without a league file
+.venv/bin/python draft/trade.py --mine "..." --theirs "..." --give "..." --get "..."
+
+# trades that help you and that the other side should also want
+.venv/bin/python draft/trade.py --league league.json --suggest [--with Alex]
+```
+
+`league.json` is `{"me": "John", "teams": {"John": ["name", ...], "Alex": [...], ...}}`.
+
+```
+you give: Ja'Marr Chase
+you get:  Christian McCaffrey, Derrick Henry
+
+                 wins     pts, weeks to 14    playoff pts
+you      +1.26 ± 0.01                +89.0          +19.4
+       (must drop Marquise Brown to make room)
+them     -0.40 ± 0.01                -28.5           -5.8
+
+>>> accept - it helps you
+```
+
+How it works: each side's rest of season is simulated with and without the trade, a few
+thousand times. Every week each player is active, on bye, or hurt; injuries follow a
+two-state chain whose rates reproduce his projected games, so a fragile player misses
+runs of weeks rather than scattered single games, and anyone on this week's injury report
+starts at the weekly model's chance of playing. The lineup is set from who's available,
+on projections, with the waiver line as a fallback at every slot. Each week's expected
+score becomes a win probability against a league-average lineup. Both versions of a
+roster see the same simulated injuries, so the difference is the trade and not noise.
+When a trade brings in more players than it sends, the evaluator cuts whoever costs the
+least.
+
+`--suggest` enumerates 1-for-1, 2-for-1, 1-for-2 and 2-for-2 deals with every other team,
+keeps those where both sides gain wins, and re-runs the best with more simulations.
+Trades like that exist whenever one roster has depth where the other has a hole.
+
+Does it work? `trade_backtest.py` drafts twelve rosters from the preseason board in each
+holdout season, makes 400 random trades between them, and values each at week 1. The
+trade is then played out on what actually happened: every week, both versions of the
+roster start the best lineup by projection among players who played, scored on what they
+scored.
+
+2,000 trades, 2021–25:
+
+| valuation | corr with realized change | picks the side that gained |
+|---|---|---|
+| lineup simulation (`trade.py`) | **0.64** | **71%** |
+| value over replacement | 0.47 | 64% |
+| projected points in minus out | 0.37 | 62% |
+
+The simulation beats points-in-minus-out by 0.27 in correlation (bootstrap 95% interval
+0.24–0.31), and it holds for every trade shape. Of the trades it called good for both
+sides, both sides really did come out ahead 37% of the time, against 15% for a random
+trade.
+
+Read with care: the realized side uses the same lineup rule and the same waiver line as
+the simulation, which flatters it somewhat, and the preseason projections are held fixed
+all season. The win estimate is against an average opponent, not your schedule or your
+playoff odds. And "the other side should want it" means by this model's valuation. A
+manager reading consensus rankings may see it differently.
+
 ## Known limits
 
-- **No rookies.** They have no NFL history to pool, so they're absent from the board
-  entirely. In a 2026 draft that's a real hole near the top of round two onward.
-- **No team or usage context.** A back who changed teams, or lost his line, or is now
-  splitting carries, is projected off his own history alone.
+- **Rookies come from draft slot and depth-chart role only.** Nothing is known about them
+  beyond where they were picked and where they sit on the week-1 chart. Rookie tight
+  ends still project about 30 points low.
+- **Role is read once, from the week-1 depth chart.** The preseason board and prior know
+  who's starting in September; a mid-season promotion or benching reaches the numbers
+  only through the box scores that follow. Team changes and carry splits within a role
+  are projected off the player's own history.
 - **The market baseline is weak**, as above.
-- Depth charts, holdouts, suspensions and camp news are all invisible to it.
+- Holdouts, suspensions and camp news are invisible to it.
 
 ## Not replicated
 

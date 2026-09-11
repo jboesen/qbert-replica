@@ -77,7 +77,7 @@ def main():
         pts, team = actual_weeks(season)
         board, _, _ = add_vbd(y)
         prev = s[s.season == season - 1].set_index("player_id").ppr
-        board["market_rank"] = board.index.map(prev).fillna(0).rank(ascending=False)
+        board["market_rank"] = board.index.to_series().map(prev).fillna(0).rank(ascending=False)
 
         v = board[["player_display_name", "position", "vbd", "proj_points"]].copy()
         v["ppg"] = board.proj_ppg

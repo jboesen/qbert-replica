@@ -29,6 +29,9 @@ def attach(s):
         role, on=["player_id", "season"], how="left")
     s["role"] = np.select([s.depth == 1, s.depth == 2, s.depth >= 3],
                           ["d1", "d2", "d3"], "none")
+    # A rookie's projection is the population prior alone, fit on veterans, and it
+    # undershoots the rookies who win jobs; they get their own coefficients per role.
+    s["rookie"] = np.where(s.own_ppg.isna(), "rookie", "vet")
     return s
 
 
@@ -36,11 +39,12 @@ def fit(s, train_mask):
     t = s[train_mask & (s.season >= FIRST) & s.proj_points.notna() & s.games.notna()
           & (s.games > 0)]
     fits = {}
+    g = "C(role):C(rookie)"
     for p in POSITIONS:
         x = t[t.position == p]
         fits[p] = (
-            smf.ols("games ~ 0 + C(role) + proj_games:C(role)", x).fit(),
-            smf.wls("ppr_pg ~ 0 + C(role) + proj_ppg:C(role)", x, weights=x.games).fit(),
+            smf.ols(f"games ~ 0 + {g} + proj_games:{g}", x).fit(),
+            smf.wls(f"ppr_pg ~ 0 + {g} + proj_ppg:{g}", x, weights=x.games).fit(),
         )
     return fits
 
@@ -51,7 +55,7 @@ def apply(s, fits):
     for c in ("proj_games", "proj_ppg", "proj_points"):
         s[f"{c}_base"] = s[c]
     for p, (g, q) in fits.items():
-        x = s[(s.position == p) & s.proj_points.notna()]
+        x = s[(s.position == p) & s.proj_points.notna() & (s.season >= FIRST)]
         if not len(x):
             continue
         s.loc[x.index, "proj_games"] = g.predict(x).clip(0.5, x.season_games)
@@ -61,8 +65,12 @@ def apply(s, fits):
 
 
 if __name__ == "__main__":
-    s = attach(pd.read_parquet("data/draft_projected.parquet"))
-    s = s[s.season >= 2012]                      # depth charts start in 2012
+    s = pd.read_parquet("data/draft_projected.parquet")
+    for c in ("proj_games", "proj_ppg", "proj_points"):   # start from the pre-role numbers
+        if f"{c}_base" in s:
+            s[c] = s[f"{c}_base"]
+    s = attach(s)
+    s = s[s.season >= FIRST]
     out = apply(s, fit(s, s.season <= 2020))
     te = out[(out.season > 2020) & out.own_ppg.notna() & out.ppr.notna()]
     N = {"QB": 24, "RB": 48, "WR": 60, "TE": 24}
