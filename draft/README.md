@@ -255,6 +255,19 @@ pregame prices from weeks 14–17, R² 0.316 with consensus alone and 0.317 with
 added). One season is a screen, not a harness verdict, but a gain under 1% of MAE could
 not move a league result anyway.
 
+**Lineups that maximise wins instead of points don't help.** A week is won by
+outscoring other teams, not by points, so the lineup with the most expected all-play
+wins can differ from the one with the most expected points: an underdog should want
+variance, a favourite should shed it. `winprob.py` keeps consensus's values, adds a
+spread model fit on earlier seasons (the empirical, right-skewed spread of scores around
+each consensus value, by position and value tier), and starts the lineup that beats the
+most opponents in simulation (`prereg_winprob.md`). It fails in both designs: the chosen
+lineup differs from consensus's in under 1% of weeks, all-play and title odds don't
+move, and the rare departures do worse than the model expected. Two players with similar
+consensus value have nearly the same spread, so there's almost no variance to trade. The
+variance lever that plausibly exists is correlation (stacking a quarterback with his
+receiver), which this model doesn't see.
+
 So the tools now build on consensus. `lineup.py` sets start/sit from weekly consensus
 ranks, and `trade.py` values players by consensus rest-of-season ranks (`--values model`
 for the old behaviour). Our model supplies what consensus doesn't: availability,
