@@ -277,6 +277,15 @@ consensus value have nearly the same spread, so there's almost no variance to tr
 variance lever that plausibly exists is correlation (stacking a quarterback with his
 receiver), which this model doesn't see.
 
+**Consensus isn't slow or biased in the ways people assume.** `ecr_bias.py` checks the
+2020–25 rankings directly. They don't chase hot or cold weeks. Blending preseason ranks
+or season-to-date scoring into the rest-of-season rank doesn't improve it out of sample.
+And backups get re-ranked the same week their starter is ruled out. The one bias that
+holds in all six seasons is Questionable players: ranked as if they'll play, they sit
+20–50% of the time. Preferring an untagged player within about four ranks is worth
+roughly 2.5 points per decision, but only before inactives are announced. `lineup.py`
+already discounts Questionable players by how often they play.
+
 So the tools now build on consensus. `lineup.py` sets start/sit from weekly consensus
 ranks, and `trade.py` values players by consensus rest-of-season ranks (`--values model`
 for the old behaviour). Our model supplies what consensus doesn't: availability,
