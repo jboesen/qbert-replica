@@ -234,6 +234,16 @@ designs, in most seasons. It makes more moves than consensus does (14–15 a sea
 against 10–12), which reads as chasing short usage spikes that don't hold up rather
 than catching durable role changes. Consensus is already good at this particular job.
 
+**Prediction markets don't add to consensus either.** Kalshi purges settled markets
+after about a month, so its 2025 season is gone. Polymarket keeps 2025, but only listed
+player props in volume from week 14, about ten players a game, with no receptions
+market. `props.py` pulls every pregame price it has (1,330 prices, 268 players, read at
+least an hour before kickoff), and `props_test.py` asks whether they improve on
+consensus. They don't: R² 0.316 with consensus alone, 0.317 with the market added, and
+out of sample the combination is slightly worse (MAE 5.58 against 5.61). The prices do
+carry signal (implied yards correlate 0.45 with actual yards), it's just signal
+consensus already has. Four weeks of one season is a screen, not a verdict.
+
 So the tools now build on consensus. `lineup.py` sets start/sit from weekly consensus
 ranks, and `trade.py` values players by consensus rest-of-season ranks (`--values model`
 for the old behaviour). Our model supplies what consensus doesn't: availability,
