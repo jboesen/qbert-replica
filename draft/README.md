@@ -281,7 +281,10 @@ So the tools now build on consensus. `lineup.py` sets start/sit from weekly cons
 ranks, and `trade.py` values players by consensus rest-of-season ranks (`--values model`
 for the old behaviour). Our model supplies what consensus doesn't: availability,
 injury runs and byes in the trade simulation. The draft advice is to draft by consensus
-and not reach.
+and not reach. `waivers.py` runs the one decision that beat consensus: each week it finds
+next week's starting holes from what's known when waivers run (byes, players off an
+active roster or ruled out last week) and fills them, falling back to the plain
+consensus move when there's nothing to fill.
 
 ## Using it
 
@@ -300,6 +303,7 @@ and not reach.
 .venv/bin/python draft/stack.py              # model + consensus season stack, fit 2020-22, checked 2023-25
 .venv/bin/python draft/adp.py                # historical ADP, for the market-signal test (prereg_adp.md)
 .venv/bin/python draft/lineup.py --mine "..." # this week's start/sit, by consensus
+.venv/bin/python draft/waivers.py --league league.json   # this week's waiver move (fill next week's holes)
 ```
 
 Then on draft day:
