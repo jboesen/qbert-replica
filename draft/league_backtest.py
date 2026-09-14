@@ -484,7 +484,9 @@ def waiver_values(S, y, crv, fits):
     ros = ros[ros.season == y]
     pre = pd.read_parquet("data/ecr_preseason.parquet")
     pre = pre[pre.season == y]
-    uv = U.season_values(y, fits)
+    # No fits means only the consensus values are wanted; the usage arm stays at consensus.
+    uv = U.season_values(y, fits) if fits is not None else pd.DataFrame(
+        columns=["player_id", "week", "value"])
     cons = np.full((n, WEEKS), np.nan)
     test = np.full((n, WEEKS), np.nan)
     for w in range(FIRST_WAIVER, WEEKS + 1):
@@ -561,9 +563,29 @@ def priority(scores, upto):
     return sorted(range(TEAMS), key=lambda t: (rate[t], pf[t]))
 
 
-def waiver_week(S, rosters, values, order, w):
+def cuttable(S, held):
+    """Rostered players a team may cut without dropping a position below its starters."""
+    counts = {p: int((S.pos[held] == p).sum()) for p in POS}
+    return np.array([i for i in held if counts[S.pos[i]] > ROSTER_MIN.get(S.pos[i], 0)])
+
+
+def consensus_move(S, held, val, free, w):
+    """The consensus wire policy: add the best free agent, drop the worst cuttable player,
+    only when the add is worth more. Returns (add, drop) or None."""
+    add = free[int(np.argmax(val[free]))]
+    can_cut = cuttable(S, held)
+    if not len(can_cut):
+        return None
+    # A player the policy cannot value at all is the first one cut.
+    vd = np.where(np.isfinite(val[can_cut]), val[can_cut], -np.inf)
+    drop = int(can_cut[int(np.argmin(vd))])
+    return (int(add), drop) if val[add] > vd.min() else None
+
+
+def waiver_week(S, rosters, values, order, w, movers=None):
     """One waiver round before week w. Teams act in priority order on their own policy,
-    so a team can lose the player it wanted to one picking ahead of it."""
+    so a team can lose the player it wanted to one picking ahead of it. `movers` swaps in
+    a different decision for some seats; everyone else runs the consensus move."""
     on_roster = np.zeros(len(S.ids), bool)
     for r in rosters:
         on_roster[r] = True
@@ -573,24 +595,17 @@ def waiver_week(S, rosters, values, order, w):
         free = np.where(~on_roster & np.isfinite(val))[0]
         if not len(free):
             continue
-        add = free[int(np.argmax(val[free]))]
-        held = np.array(rosters[t])
-        counts = {p: int((S.pos[held] == p).sum()) for p in POS}
-        can_cut = np.array([i for i in held
-                            if counts[S.pos[i]] > ROSTER_MIN.get(S.pos[i], 0)])
-        if not len(can_cut):
+        move = (movers or {}).get(t, consensus_move)(S, np.array(rosters[t]), val, free, w)
+        if move is None:
             continue
-        # A player the policy cannot value at all is the first one cut.
-        vd = np.where(np.isfinite(val[can_cut]), val[can_cut], -np.inf)
-        drop = int(can_cut[int(np.argmin(vd))])
-        if val[add] > vd.min():
-            rosters[t] = [i for i in rosters[t] if i != drop] + [int(add)]
-            on_roster[add], on_roster[drop] = True, False
-            moves[t] += 1
+        add, drop = move
+        rosters[t] = [i for i in rosters[t] if i != drop] + [int(add)]
+        on_roster[add], on_roster[drop] = True, False
+        moves[t] += 1
     return moves
 
 
-def simulate(S, drafted, values, who):
+def simulate(S, drafted, values, who, movers=None):
     """Play a season week by week, running the wire between weeks.
 
     Waiver priority depends on the standings so far, so the order cannot be known in
@@ -604,7 +619,7 @@ def simulate(S, drafted, values, who):
             scores[t, w] = week_points(S, rosters[t], S.ecr_val, w)
         if w + 1 < WEEKS and who:
             order = [t for t in priority(scores, w) if t in who]
-            moves += waiver_week(S, rosters, values, order, w + 2)
+            moves += waiver_week(S, rosters, values, order, w + 2, movers)
     return scores, moves, rosters
 
 
@@ -700,6 +715,197 @@ def report_waivers(d):
     print("('cons minus none' is close to zero by construction: when every team gets the "
           "same\n lever, the relative standings need not move. 'solo minus none' is the "
           "lever's size.)")
+
+
+# ---------------------------------------------------------------- streaming (prereg_streaming.md)
+
+def known_unavailable(S, y):
+    """Who is known to be unavailable for week w at the waiver decision before it.
+
+    The harness's own eligibility reads week w's roster status and injury report, which
+    publish after waivers clear, so a waiver policy can't use it. What it can see is the
+    schedule and last week's files: a bye, a player off the 53, or one ruled Out or
+    Doubtful last week, assumed still out. Teams on bye have no roster rows, so a player
+    whose team was off in week w-1 is read from his last week before that. Row w-1 of the
+    result is the decision before week w.
+    """
+    n = len(S.ids)
+    ix = {p: i for i, p in enumerate(S.ids)}
+    g = pd.read_csv("data/games.csv")
+    g = g[(g.season == y) & (g.game_type == "REG")]
+    plays = {(w, t) for w, a, h in zip(g.week, g.away_team, g.home_team) for t in (a, h)}
+    inj = pd.read_parquet(f"data/injuries_{y}.parquet")
+    out = {(p, w) for p, w, s in zip(inj.gsis_id, inj.week, inj.report_status) if s in OUT}
+    ro = pd.read_parquet(f"data/roster_weekly_{y}.parquet")
+    ro = ro[(ro.game_type == "REG") & (ro.week <= WEEKS) & ro.gsis_id.isin(ix)]
+    ro = ro.assign(team=W.norm_team(ro.team)).sort_values("week")
+    last = {}                                 # player -> (week, status, team), latest seen
+    rows = {w: list(zip(x.gsis_id, x.status, x.team)) for w, x in ro.groupby("week")}
+    gone = np.ones((n, WEEKS), bool)          # no roster row yet counts as unavailable
+    for w in range(FIRST_WAIVER, WEEKS + 1):
+        for p, s, t in rows.get(w - 1, []):
+            last[p] = (w - 1, s, t)
+        for p, (wk, s, t) in last.items():
+            gone[ix[p], w - 1] = s not in ACTIVE or (p, wk) in out or (w, t) not in plays
+    return gone
+
+
+def holes(S, players, gone_w):
+    """Starting slots, flex included, the players not known unavailable can't fill."""
+    c = dict.fromkeys(POS, 0)
+    for i in players:
+        if not gone_w[i] and S.pos[i] in c:
+            c[S.pos[i]] += 1
+    return needs(c)
+
+
+def starters(S, players, val, gone_w):
+    """The week's lineup filled by rest-of-season value from players known available.
+    Weekly consensus for the week isn't out at waiver time, so this is the best guess."""
+    players = [i for i in players if not gone_w[i]]
+    v = {i: val[i] if np.isfinite(val[i]) else -np.inf for i in players}
+    used = set()
+    for p, k in SLOTS.items():
+        used |= set(sorted((i for i in players if S.pos[i] == p), key=lambda i: -v[i])[:k])
+    flex = [i for i in players if S.pos[i] in FLEX and i not in used]
+    if flex:
+        used.add(max(flex, key=lambda i: v[i]))
+    return used
+
+
+def streaming_policy(S, gone, log):
+    """prereg_streaming.md: fill next week's starting hole when there is one, even with a
+    player consensus ranks below the one cut; otherwise move exactly as consensus does.
+
+    The consensus wire ranks free agents on rest-of-season value alone, so it will add a
+    fourth receiver while the only tight end sits on bye. A zero in a starting slot is a
+    sure loss of points that week, and the bet is that it outweighs the rest-of-season
+    value given up. Each hole-driven move is logged with what consensus would have done.
+    """
+    def move(S, held, val, free, w):
+        cons = consensus_move(S, held, val, free, w)
+        g = gone[:, w - 1]
+        before = holes(S, held, g)
+        if not sum(before.values()):
+            return cons
+        fills = [p for p in POS if before[p] > 0 or (p in FLEX and before["FLEX"] > 0)]
+        cand = free[np.isin(S.pos[free], fills) & ~g[free]]
+        if not len(cand):
+            return cons
+        add = int(cand[int(np.argmax(val[cand]))])
+        after_add = list(held) + [add]
+        lineup = starters(S, after_add, val, g)
+        best = None
+        for d in cuttable(S, held):
+            left = sum(holes(S, [i for i in after_add if i != d], g).values())
+            if left >= sum(before.values()):         # the move has to close a hole
+                continue
+            key = (left, d in lineup, val[d] if np.isfinite(val[d]) else -np.inf)
+            if best is None or key < best[0]:
+                best = (key, int(d))
+        if best is None:
+            return cons
+        mine = (add, best[1])
+        log.append({"week": w, "holes": sum(before.values()), "add": S.ids[add],
+                    "drop": S.ids[best[1]], "add_pos": S.pos[add], "drop_pos": S.pos[best[1]],
+                    "add_val": val[add], "drop_val": best[0][2], "same_as_cons": mine == cons,
+                    "cons_moves": cons is not None, "cf_pts": cf_points(S, held, mine, cons, w)})
+        return mine
+    return move
+
+
+def cf_points(S, held, mine, cons, w):
+    """Week-w lineup points with the streaming move minus with the consensus move (or no
+    move), on the same roster: the one-week payoff of acting on the hole."""
+    def pts(m):
+        r = list(held) if m is None else [i for i in held if i != m[1]] + [m[0]]
+        return week_points(S, r, S.ecr_val, w - 1)
+    return pts(mine) - pts(cons)
+
+
+def run_streaming():
+    curves = rank_curve()
+    wk_proj = weekly_projections()
+    rows, moves_log = [], []
+    for y in SEASONS:
+        S = Season(y, wk_proj, curves)
+        crv = C.weekly_curve(range(2020, y))
+        cons_val, _ = waiver_values(S, y, crv, None)     # consensus values only
+        gone = known_unavailable(S, y)
+        every = set(range(TEAMS))
+        for lg in range(LEAGUES):
+            # The same draws in the same order as run_waivers, so drafts and control match.
+            rng = np.random.default_rng([y, lg])
+            noise = rng.standard_normal((TEAMS + 1, len(S.ids)))
+            ecr_orders = []
+            for k in range(TEAMS + 1):
+                score = S.ecr_mean + NOISE * S.ecr_sd * noise[k]
+                ok = np.where(np.isfinite(score))[0]
+                ecr_orders.append(list(ok[np.argsort(score[ok])]))
+            scheds = schedules(rng, SCHEDULES)
+            base = [cons_val] * TEAMS
+            for seat in range(TEAMS):
+                orders = list(ecr_orders[:TEAMS])
+                orders[seat] = S.exact_order
+                drafted = draft(S, orders)
+                log = []
+                arms = (("cons", None), ("stream", {seat: streaming_policy(S, gone, log)}))
+                week_sc = {}
+                for arm, movers in arms:
+                    sc, moves, _ = simulate(S, drafted, base, every, movers)
+                    week_sc[arm] = sc[seat]
+                    res = [season_outcome(sc, s) for s in scheds]
+                    rows.append({
+                        "season": y, "league": lg, "seat": seat, "arm": arm,
+                        "title": np.mean([r[2][seat] for r in res]),
+                        "playoff": np.mean([r[1][seat] for r in res]),
+                        "wins": np.mean([r[0][seat] for r in res]),
+                        "all_play": all_play(sc, seat),
+                        "pts_reg": sc[seat, :REG].sum(),
+                        "pts_playoff": sc[seat, REG:].sum(),
+                        "moves": moves[seat],
+                    })
+                for e in log:
+                    e.update(season=y, league=lg, seat=seat, paired_pts=(
+                        week_sc["stream"][e["week"] - 1] - week_sc["cons"][e["week"] - 1]))
+                moves_log += log
+            print(f"{y} league {lg + 1}/{LEAGUES}", flush=True)
+    return pd.DataFrame(rows), pd.DataFrame(moves_log)
+
+
+def report_streaming(d, mv):
+    print("\n=== waivers: hole-aware streaming vs consensus waivers ===")
+    print("12-team PPR leagues on 2021-25, exact-consensus draft and consensus lineups, "
+          "every other\nseat on the consensus wire; one add/drop per team per week\n")
+    print(f"{'arm':6s} {'title':>7s} {'playoff':>8s} {'wins':>6s} {'all-play':>9s} "
+          f"{'reg pts':>8s} {'po pts':>7s} {'adds':>6s}")
+    for arm, g in d.groupby("arm", sort=False):
+        print(f"{arm:6s} {100 * g.title.mean():6.1f}% {100 * g.playoff.mean():7.1f}% "
+              f"{g.wins.mean():6.2f} {100 * g.all_play.mean():8.1f}% "
+              f"{g.pts_reg.mean():8.0f} {g.pts_playoff.mean():7.0f} {g.moves.mean():6.2f}")
+    print("\npreregistered test (prereg_streaming.md), season-cluster bootstrap 90% interval:")
+    keep = paired(d, "stream", "cons", "stream minus consensus")
+    print(f"  -> {'passes this design' if keep else 'fails this design'}")
+
+    seats = d[d.arm == "stream"].groupby("season").size()
+    print("\nreported, not gated: hole-driven moves by the test seat (per league-seat season)")
+    if not len(mv):
+        print("  none")
+        return
+    diff = mv[~mv.same_as_cons]
+    print(f"  {'season':6s} {'hole moves':>10s} {'differ':>7s} {'cf pts':>7s} {'paired pts':>11s}")
+    for y, n_seats in seats.items():
+        m, x = mv[mv.season == y], diff[diff.season == y]
+        print(f"  {y:<6d} {len(m) / n_seats:10.2f} {len(x) / n_seats:7.2f} "
+              f"{x.cf_pts.mean():+7.1f} {x.paired_pts.mean():+11.1f}")
+    print(f"  {'all':6s} {len(mv) / seats.sum():10.2f} {len(diff) / seats.sum():7.2f} "
+          f"{diff.cf_pts.mean():+7.1f} {diff.paired_pts.mean():+11.1f}")
+    print("  (differ: the move is not the one consensus would make in the same state; "
+          "cf pts: that\n   week's lineup points with the move minus with consensus's move, "
+          "same roster; paired pts:\n   the stream arm's score that week minus the control "
+          "arm's)")
+    print("  holes filled, by position added: "
+          + " ".join(f"{p} {k}" for p, k in diff.add_pos.value_counts().items()))
 
 
 # ---------------------------------------------------------------- the experiment
@@ -856,9 +1062,18 @@ if __name__ == "__main__":
         NOISE = float(sys.argv[sys.argv.index("--noise") + 1])
     if "--leagues" in sys.argv:      # mechanics checks only; a real run uses the default
         LEAGUES = int(sys.argv[sys.argv.index("--leagues") + 1])
+    # Never overwrite a real result with a short check.
+    check = "" if LEAGUES == 20 else f"_check{LEAGUES}"
+    if "--streaming" in sys.argv:
+        d, mv = run_streaming()
+        d.to_parquet(f"data/league_streaming{check}_noise{NOISE:g}.parquet")
+        mv.to_parquet(f"data/league_streaming_moves{check}_noise{NOISE:g}.parquet")
+        print(f"\nopponent noise: {NOISE:g} x ECR sd")
+        report_streaming(d, mv)
+        sys.exit()
     if "--waivers" in sys.argv:
         d = run_waivers()
-        d.to_parquet(f"data/league_waivers_noise{NOISE:g}.parquet")
+        d.to_parquet(f"data/league_waivers{check}_noise{NOISE:g}.parquet")
         print(f"\nopponent noise: {NOISE:g} x ECR sd")
         report_waivers(d)
         sys.exit()

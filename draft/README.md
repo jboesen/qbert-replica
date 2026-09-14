@@ -234,6 +234,15 @@ designs, in most seasons. It makes more moves than consensus does (14–15 a sea
 against 10–12), which reads as chasing short usage spikes that don't hold up rather
 than catching durable role changes. Consensus is already good at this particular job.
 
+**Filling next week's hole on the wire does beat consensus waivers, by a little.** The
+consensus wire policy adds the best rest-of-season free agent at any position, even when
+the only tight end is on bye. A seat that instead fills a starting hole it can see at
+waiver time (a bye, or a player off the 53 or ruled Out or Doubtful last week), dropping
+its least useful bench player even when the add ranks lower, gains 1.0 point of all-play
+and 1.6 of title odds with noisy opponents, 2.0 and 1.2 with exact ones, positive in all
+five seasons in both (`prereg_streaming.md`). It makes about two such moves a season,
+each worth 6-8 lineup points that week. Same signal as consensus, better decision.
+
 **Prediction markets are sharp, but consensus already knows what they know.** Kalshi
 moves settled markets to a separate historical API, which keeps the whole 2025 season:
 receptions, receiving yards, passing yards and anytime touchdowns, as ladders of "X or
@@ -287,6 +296,7 @@ and not reach.
 .venv/bin/python draft/consensus.py          # FantasyPros consensus ranks, as of each decision
 .venv/bin/python draft/league_backtest.py    # does it win leagues vs consensus? (--noise 0: exact opponents)
 .venv/bin/python draft/league_backtest.py --waivers   # does usage beat consensus on the wire? (prereg_waivers.md)
+.venv/bin/python draft/league_backtest.py --streaming # does filling next week's hole beat consensus waivers? (prereg_streaming.md)
 .venv/bin/python draft/stack.py              # model + consensus season stack, fit 2020-22, checked 2023-25
 .venv/bin/python draft/adp.py                # historical ADP, for the market-signal test (prereg_adp.md)
 .venv/bin/python draft/lineup.py --mine "..." # this week's start/sit, by consensus
