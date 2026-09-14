@@ -234,15 +234,26 @@ designs, in most seasons. It makes more moves than consensus does (14–15 a sea
 against 10–12), which reads as chasing short usage spikes that don't hold up rather
 than catching durable role changes. Consensus is already good at this particular job.
 
-**Prediction markets don't add to consensus either.** Kalshi purges settled markets
-after about a month, so its 2025 season is gone. Polymarket keeps 2025, but only listed
-player props in volume from week 14, about ten players a game, with no receptions
-market. `props.py` pulls every pregame price it has (1,330 prices, 268 players, read at
-least an hour before kickoff), and `props_test.py` asks whether they improve on
-consensus. They don't: R² 0.316 with consensus alone, 0.317 with the market added, and
-out of sample the combination is slightly worse (MAE 5.58 against 5.61). The prices do
-carry signal (implied yards correlate 0.45 with actual yards), it's just signal
-consensus already has. Four weeks of one season is a screen, not a verdict.
+**Prediction markets are sharp, but consensus already knows what they know.** Kalshi
+moves settled markets to a separate historical API, which keeps the whole 2025 season:
+receptions, receiving yards, passing yards and anytime touchdowns, as ladders of "X or
+more" markets with real volume. `kalshi.py` reads every one at the last hour ending at
+least an hour before kickoff (21,123 pregame prices, 494 players, weeks 1–18), and
+`kalshi_test.py` turns each ladder into an expected stat and compares against consensus
+on 3,465 player-weeks:
+
+- The prices are good. Implied receptions and receiving yards correlate 0.52 and 0.53
+  with what happened, and touchdown prices are calibrated (priced 9% scored 8%, priced
+  36% scored 37%).
+- Adding them to consensus changes almost nothing. Out-of-sample MAE goes 5.17 → 5.15
+  at RB, 4.86 → 4.83 at WR, 3.95 → 3.93 at TE, and gets worse at QB (6.38 → 6.43).
+- On their own they rank players worse than consensus at RB, WR and TE, even at WR and
+  TE, where the market prices nearly the whole PPR score, and tie at QB.
+
+Polymarket gives the same answer on thinner data (`props.py`, `props_test.py`: 1,330
+pregame prices from weeks 14–17, R² 0.316 with consensus alone and 0.317 with the market
+added). One season is a screen, not a harness verdict, but a gain under 1% of MAE could
+not move a league result anyway.
 
 So the tools now build on consensus. `lineup.py` sets start/sit from weekly consensus
 ranks, and `trade.py` values players by consensus rest-of-season ranks (`--values model`
