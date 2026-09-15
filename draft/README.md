@@ -264,6 +264,16 @@ seasons are positive with noisy opponents, so it isn't shown to help. Leaning to
 positions the room has under-drafted barely changes a pick: consensus-plus-noise
 opponents rarely leave a whole position on the board, and exact ones never do.
 
+**Stashing other teams' backup running backs on top of streaming isn't shown to help.**
+A seat that streams and also, in weeks with no hole to fill, holds up to two backups
+behind lead backs of teams its own backs don't play for (priced by a contingent value fit
+on earlier seasons: how often lead backs miss games, how likely the backup is to inherit
+the role, what he scores then) gains 0.8 points of all-play with noisy opponents and 1.6
+with exact ones, but only in 3 of 5 seasons in the noisy design, so it fails the rule
+(`prereg_handcuffs.md`). The stashes do start: about eight starts and 90-100 lineup
+points a season, against about two starts for handcuffs behind the seat's own backs,
+which add nothing. The gain comes from seasons with many lead-back absences.
+
 **Prediction markets are sharp, but consensus already knows what they know.** Kalshi
 moves settled markets to a separate historical API, which keeps the whole 2025 season:
 receptions, receiving yards, passing yards and anytime touchdowns, as ladders of "X or
@@ -344,6 +354,8 @@ consensus move when there's nothing to fill.
 .venv/bin/python draft/league_backtest.py --waivers   # does usage beat consensus on the wire? (prereg_waivers.md)
 .venv/bin/python draft/league_backtest.py --streaming # does filling next week's hole beat consensus waivers? (prereg_streaming.md)
 .venv/bin/python draft/sim_draftstruct.py --noise 1  # draft structure on consensus: late QB/TE, template, reactive (prereg_draftstruct.md)
+
+.venv/bin/python draft/sim_handcuffs.py --noise 1  # streaming plus a cross-team RB stash (prereg_handcuffs.md)
 .venv/bin/python draft/stack.py              # model + consensus season stack, fit 2020-22, checked 2023-25
 .venv/bin/python draft/adp.py                # historical ADP, for the market-signal test (prereg_adp.md)
 .venv/bin/python draft/lineup.py --mine "..." # this week's start/sit, by consensus
