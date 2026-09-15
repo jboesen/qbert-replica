@@ -354,6 +354,22 @@ streaming, positive in 4 of 5 seasons; title odds are noisy (+0.4 and +2.5). It'
 bound: the seat trades about 8 times a season against opponents who accept every fair
 offer, while real teams trade 0.4 times a season.
 
+**Two trades a season that both teams' numbers favour still beat streaming alone, by
+less.** `sim_tradecap.py` reuses that trade search with two realistic limits
+(`prereg_tradecap.md`). The seat makes at most one, two or four trades a season, each only
+when it projects at least 10 rest-of-season lineup points. And under mutual benefit the
+opponent also refuses any trade that lowers his own projected starting lineup, on the same
+consensus numbers. The preregistered arm, two such trades a season, makes the busiest
+trader in a typical real league (about the 95th percentile of Sleeper teams). It passes in
+both designs: +1.1 points of all-play with noisy opponents (positive in all five seasons,
+title -0.7) and +1.9 with exact ones (4 of 5, title +3.6). That's roughly what streaming
+itself added, and 2-3 points below the uncapped upper bound. Most of the uncapped gain
+sits in the first trade or two: one value-fair trade a season keeps +1.0 and +2.8. The
+mutual rule costs another 0.6-1.1 points at two trades, and no more than that, because such
+offers are common: the seat has one in about
+nine weeks of ten, and hundreds of them on week-3 rosters. The harness still assumes an
+opponent accepts whatever his own projections favour, which a real manager won't always do.
+
 So the tools now build on consensus. `lineup.py` sets start/sit from weekly consensus
 ranks, and `trade.py` values players by consensus rest-of-season ranks (`--values model`
 for the old behaviour). Our model supplies what consensus doesn't: availability,
