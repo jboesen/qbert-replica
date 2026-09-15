@@ -273,6 +273,19 @@ with exact ones, but only in 3 of 5 seasons in the noisy design, so it fails the
 (`prereg_handcuffs.md`). The stashes do start: about eight starts and 90-100 lineup
 points a season, against about two starts for handcuffs behind the seat's own backs,
 which add nothing. The gain comes from seasons with many lead-back absences.
+**Bidding just enough on FAAB waivers doesn't beat bidding like the league.** Many
+leagues run blind-bid budgets instead of priority waivers. `sleeper_faab.py` pulled
+every waiver claim from 887 real 12-team redraft PPR FAAB leagues on Sleeper (2023-25,
+123,881 claims). Real bids are skewed and fall through the season: winning bids average
+7.4% of budget with a median of 3%, and 16% for a top-12 player in weeks 2-4.
+`sim_faab.py` gives every team $100 and opponents bids drawn from those claims. The test
+seat keeps streaming's claims and bids the least that wins with 75% probability against
+the teams it can see chasing the same player, under a pacing cap (`prereg_faab.md`). It
+wins its intended claim 41-47% of the time against 12-14% and overpays half as much.
+All-play doesn't move (-0.4 and +0.4 points, not positive in 4 of 5 seasons), so it
+fails in both designs, though title odds rose 1.3 and 2.4 points. Caveat: the simulated
+opponents all chase the same player and spend their whole budget, which real managers
+don't.
 
 **Prediction markets are sharp, but consensus already knows what they know.** Kalshi
 moves settled markets to a separate historical API, which keeps the whole 2025 season:
