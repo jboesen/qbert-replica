@@ -243,6 +243,17 @@ and 1.6 of title odds with noisy opponents, 2.0 and 1.2 with exact ones, positiv
 five seasons in both (`prereg_streaming.md`). It makes about two such moves a season,
 each worth 6-8 lineup points that week. Same signal as consensus, better decision.
 
+**Draft structure on top of consensus doesn't clear the bar either.** Three rules keep
+the exact consensus order and only limit which positions the seat takes when, with the
+streaming wire in every arm (`sim_draftstruct.py`, `prereg_draftstruct.md`). Waiting on
+QB until round 9 and TE until round 8 loses in both designs (all-play -2.5 and -1.4
+points, lineups lower most weeks), so a late QB isn't free even with a wire. A best-ball
+template (2-3 RB and 3-4 WR through round 6, at most one QB or TE) gains +0.6 and +0.7
+points of all-play and about 9 regular-season points in both designs, but only 3 of 5
+seasons are positive with noisy opponents, so it isn't shown to help. Leaning toward
+positions the room has under-drafted barely changes a pick: consensus-plus-noise
+opponents rarely leave a whole position on the board, and exact ones never do.
+
 **Prediction markets are sharp, but consensus already knows what they know.** Kalshi
 moves settled markets to a separate historical API, which keeps the whole 2025 season:
 receptions, receiving yards, passing yards and anytime touchdowns, as ladders of "X or
@@ -309,6 +320,7 @@ consensus move when there's nothing to fill.
 .venv/bin/python draft/league_backtest.py    # does it win leagues vs consensus? (--noise 0: exact opponents)
 .venv/bin/python draft/league_backtest.py --waivers   # does usage beat consensus on the wire? (prereg_waivers.md)
 .venv/bin/python draft/league_backtest.py --streaming # does filling next week's hole beat consensus waivers? (prereg_streaming.md)
+.venv/bin/python draft/sim_draftstruct.py --noise 1  # draft structure on consensus: late QB/TE, template, reactive (prereg_draftstruct.md)
 .venv/bin/python draft/stack.py              # model + consensus season stack, fit 2020-22, checked 2023-25
 .venv/bin/python draft/adp.py                # historical ADP, for the market-signal test (prereg_adp.md)
 .venv/bin/python draft/lineup.py --mine "..." # this week's start/sit, by consensus
