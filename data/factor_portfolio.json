@@ -1,0 +1,176 @@
+{
+  "selection_rule": {
+    "pooled_all_play_gt": 0.0,
+    "positive_seasons_at_least": 4,
+    "title_floor": -0.01
+  },
+  "factors": {
+    "hole_aware_streaming": {
+      "status": "keep",
+      "description": "Use the waiver wire to fill a known upcoming starting-lineup hole.",
+      "runs": {
+        "realistic": {
+          "state": "pass",
+          "file": "/Users/johnboesen/Documents/Code/qbert-replica/data/league_streaming_noise1.parquet",
+          "all_play_pp": 1.03,
+          "title_pp": 1.55,
+          "all_play_by_season_pp": {
+            "2021": 1.147,
+            "2022": 0.833,
+            "2023": 1.575,
+            "2024": 0.555,
+            "2025": 1.039
+          },
+          "positive_seasons": 5
+        },
+        "exact": {
+          "state": "pass",
+          "file": "/Users/johnboesen/Documents/Code/qbert-replica/data/league_streaming_noise0.parquet",
+          "all_play_pp": 2.035,
+          "title_pp": 1.154,
+          "all_play_by_season_pp": {
+            "2021": 2.706,
+            "2022": 1.786,
+            "2023": 3.517,
+            "2024": 0.649,
+            "2025": 1.515
+          },
+          "positive_seasons": 5
+        }
+      }
+    },
+    "late_inactive_news": {
+      "status": "reject",
+      "description": "Replace a player only when the official late inactive list confirms he is out.",
+      "runs": {
+        "realistic": {
+          "state": "pass",
+          "file": "/Users/johnboesen/Documents/Code/qbert-replica-factorlab/data/league_late_news_stream_noise1.parquet",
+          "all_play_pp": 0.328,
+          "title_pp": 0.35,
+          "all_play_by_season_pp": {
+            "2021": 0.609,
+            "2022": 0.122,
+            "2023": 0.211,
+            "2024": 0.641,
+            "2025": 0.06
+          },
+          "positive_seasons": 5
+        },
+        "exact": {
+          "state": "fail",
+          "file": "/Users/johnboesen/Documents/Code/qbert-replica-factorlab/data/league_late_news_stream_noise0.parquet",
+          "all_play_pp": -0.054,
+          "title_pp": 0.346,
+          "all_play_by_season_pp": {
+            "2021": -0.271,
+            "2022": 0.0,
+            "2023": -0.108,
+            "2024": 0.108,
+            "2025": 0.0
+          },
+          "positive_seasons": 1
+        }
+      }
+    },
+    "kdst_rotation": {
+      "status": "reject",
+      "description": "Cycle handcuff RBs through kickoff windows after streaming.",
+      "runs": {
+        "realistic": {
+          "state": "fail",
+          "file": "/Users/johnboesen/Documents/Code/qbert-replica-kdst/data/league_kdst_noise1.parquet",
+          "all_play_pp": -0.863,
+          "title_pp": -1.629,
+          "all_play_by_season_pp": {
+            "2021": -1.366,
+            "2022": -0.725,
+            "2023": -1.139,
+            "2024": -0.741,
+            "2025": -0.344
+          },
+          "positive_seasons": 0
+        },
+        "exact": {
+          "state": "missing",
+          "file": "/Users/johnboesen/Documents/Code/qbert-replica-kdst/data/league_kdst_noise0.parquet"
+        }
+      }
+    },
+    "early_rb_risk_discount": {
+      "status": "reject",
+      "description": "Discount RB consensus value by 15% in the first six rounds.",
+      "runs": {
+        "realistic": {
+          "state": "fail",
+          "file": "/Users/johnboesen/Documents/Code/qbert-replica-rbrisk/data/league_rbrisk_noise1.parquet",
+          "all_play_pp": 0.899,
+          "title_pp": -2.688,
+          "all_play_by_season_pp": {
+            "2021": -1.491,
+            "2022": -1.742,
+            "2023": -0.795,
+            "2024": 5.403,
+            "2025": 3.12
+          },
+          "positive_seasons": 2
+        },
+        "exact": {
+          "state": "missing",
+          "file": "/Users/johnboesen/Documents/Code/qbert-replica-rbrisk/data/league_rbrisk_noise0.parquet"
+        }
+      }
+    },
+    "bye_week_clustering": {
+      "status": "reject",
+      "description": "Break close draft ties toward projected starters sharing a bye week.",
+      "runs": {
+        "realistic": {
+          "state": "fail",
+          "file": "/Users/johnboesen/Documents/Code/qbert-replica-byecluster/data/league_byecluster_noise1.parquet",
+          "all_play_pp": 0.364,
+          "title_pp": 0.137,
+          "all_play_by_season_pp": {
+            "2021": -0.522,
+            "2022": 1.412,
+            "2023": -0.06,
+            "2024": 1.231,
+            "2025": -0.241
+          },
+          "positive_seasons": 2
+        },
+        "exact": {
+          "state": "missing",
+          "file": "/Users/johnboesen/Documents/Code/qbert-replica-byecluster/data/league_byecluster_noise0.parquet"
+        }
+      }
+    },
+    "late_round_expert_disagreement": {
+      "status": "reject",
+      "description": "Use the most optimistic expert rank to break late-round consensus ties.",
+      "runs": {
+        "realistic": {
+          "state": "fail",
+          "file": "/Users/johnboesen/Documents/Code/qbert-replica-lateupside/data/league_lateupside_noise1.parquet",
+          "all_play_pp": -0.79,
+          "title_pp": -0.975,
+          "all_play_by_season_pp": {
+            "2021": -2.749,
+            "2022": -0.279,
+            "2023": 0.915,
+            "2024": -1.45,
+            "2025": -0.384
+          },
+          "positive_seasons": 1
+        },
+        "exact": {
+          "state": "missing",
+          "file": "/Users/johnboesen/Documents/Code/qbert-replica-lateupside/data/league_lateupside_noise0.parquet"
+        }
+      }
+    }
+  },
+  "usable_shortlist": [
+    "hole_aware_streaming"
+  ]
+}

@@ -151,10 +151,13 @@ class Season:
         inj = pd.read_parquet(f"data/injuries_{y}.parquet")
         out = {(p, w) for p, w, s in zip(inj.gsis_id, inj.week, inj.report_status) if s in OUT}
         self.elig = np.zeros((n, WEEKS), bool)
+        self.inactive = np.zeros((n, WEEKS), bool)
         ro = ro.assign(team=W.norm_team(ro.team))
         for p, w, t, s in zip(ro.gsis_id, ro.week, ro.team, ro.status):
             if s in ACTIVE and (w, t) in plays and (p, w) not in out:
                 self.elig[ix[p], w - 1] = True
+            if s == "INA":
+                self.inactive[ix[p], w - 1] = True
         q = {(p, w) for p, w, s in zip(inj.gsis_id, inj.week, inj.report_status)
              if s == "Questionable"}
         p_q = W.play_probs(y).get("Questionable", 0.57)
@@ -392,11 +395,12 @@ def draft(S, orders):
     return rosters
 
 
-def week_points(S, roster, value, w):
+def week_points(S, roster, value, w, late_inactives=False):
     """Actual points in week w from the lineup a policy sets on its values."""
     r = np.array(roster)
     pos = S.pos[r]
-    v = np.where(S.elig[r, w], value[r, w], -np.inf)
+    available = S.elig[r, w] & (~S.inactive[r, w] if late_inactives else True)
+    v = np.where(available, value[r, w], -np.inf)
     used = np.zeros(len(r), bool)
     total = 0.0
     for p, k in SLOTS.items():
@@ -605,7 +609,7 @@ def waiver_week(S, rosters, values, order, w, movers=None):
     return moves
 
 
-def simulate(S, drafted, values, who, movers=None):
+def simulate(S, drafted, values, who, movers=None, late_seats=frozenset()):
     """Play a season week by week, running the wire between weeks.
 
     Waiver priority depends on the standings so far, so the order cannot be known in
@@ -616,7 +620,7 @@ def simulate(S, drafted, values, who, movers=None):
     moves = np.zeros(TEAMS, int)
     for w in range(WEEKS):
         for t in range(TEAMS):
-            scores[t, w] = week_points(S, rosters[t], S.ecr_val, w)
+            scores[t, w] = week_points(S, rosters[t], S.ecr_val, w, t in late_seats)
         if w + 1 < WEEKS and who:
             order = [t for t in priority(scores, w) if t in who]
             moves += waiver_week(S, rosters, values, order, w + 2, movers)

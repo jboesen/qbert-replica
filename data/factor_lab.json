@@ -1,0 +1,201 @@
+{
+  "purpose": "factor research gate, not a league-win verdict",
+  "baseline": "weekly expert consensus only",
+  "timing": "rolling origin: train seasons before the scored season",
+  "factor_screen": [
+    {
+      "factor": "availability",
+      "conditional_mi_nats": 0.04351,
+      "incremental_rmse_points": 0.176,
+      "columns": [
+        "inj_q",
+        "inj_d",
+        "prac_dnp",
+        "prac_lim",
+        "prac_full",
+        "on_report",
+        "ina"
+      ]
+    },
+    {
+      "factor": "our_model",
+      "conditional_mi_nats": 0.03793,
+      "incremental_rmse_points": 0.0518,
+      "columns": [
+        "proj"
+      ]
+    },
+    {
+      "factor": "game_environment",
+      "conditional_mi_nats": 0.03332,
+      "incremental_rmse_points": 0.0064,
+      "columns": [
+        "implied",
+        "spread",
+        "total",
+        "home"
+      ]
+    },
+    {
+      "factor": "season_to_date",
+      "conditional_mi_nats": 0.02933,
+      "incremental_rmse_points": 0.0416,
+      "columns": [
+        "ppg",
+        "games",
+        "missed",
+        "ytd_miss"
+      ]
+    },
+    {
+      "factor": "role_usage",
+      "conditional_mi_nats": 0.00883,
+      "incremental_rmse_points": 0.0196,
+      "columns": [
+        "tgt_rec",
+        "tgt_base",
+        "car_rec",
+        "car_base",
+        "rz_rec",
+        "rz_base",
+        "snap_rec",
+        "snap_base",
+        "vacancy",
+        "use_miss"
+      ]
+    },
+    {
+      "factor": "consensus_ros",
+      "conditional_mi_nats": 0.0,
+      "incremental_rmse_points": 0.0576,
+      "columns": [
+        "r_rank",
+        "r_sd"
+      ]
+    }
+  ],
+  "greedy_diversification_ladder": [
+    {
+      "add": "availability",
+      "remaining_incremental_rmse_points": 0.176,
+      "model_columns": [
+        "inj_q",
+        "inj_d",
+        "prac_dnp",
+        "prac_lim",
+        "prac_full",
+        "on_report",
+        "ina"
+      ]
+    },
+    {
+      "add": "our_model",
+      "remaining_incremental_rmse_points": 0.0788,
+      "model_columns": [
+        "inj_q",
+        "inj_d",
+        "prac_dnp",
+        "prac_lim",
+        "prac_full",
+        "on_report",
+        "ina",
+        "proj"
+      ]
+    },
+    {
+      "add": "consensus_ros",
+      "remaining_incremental_rmse_points": 0.0105,
+      "model_columns": [
+        "inj_q",
+        "inj_d",
+        "prac_dnp",
+        "prac_lim",
+        "prac_full",
+        "on_report",
+        "ina",
+        "proj",
+        "r_rank",
+        "r_sd"
+      ]
+    },
+    {
+      "add": "game_environment",
+      "remaining_incremental_rmse_points": 0.0011,
+      "model_columns": [
+        "inj_q",
+        "inj_d",
+        "prac_dnp",
+        "prac_lim",
+        "prac_full",
+        "on_report",
+        "ina",
+        "proj",
+        "r_rank",
+        "r_sd",
+        "implied",
+        "spread",
+        "total",
+        "home"
+      ]
+    },
+    {
+      "add": "season_to_date",
+      "remaining_incremental_rmse_points": -0.0065,
+      "model_columns": [
+        "inj_q",
+        "inj_d",
+        "prac_dnp",
+        "prac_lim",
+        "prac_full",
+        "on_report",
+        "ina",
+        "proj",
+        "r_rank",
+        "r_sd",
+        "implied",
+        "spread",
+        "total",
+        "home",
+        "ppg",
+        "games",
+        "missed",
+        "ytd_miss"
+      ]
+    },
+    {
+      "add": "role_usage",
+      "remaining_incremental_rmse_points": -0.0033,
+      "model_columns": [
+        "inj_q",
+        "inj_d",
+        "prac_dnp",
+        "prac_lim",
+        "prac_full",
+        "on_report",
+        "ina",
+        "proj",
+        "r_rank",
+        "r_sd",
+        "implied",
+        "spread",
+        "total",
+        "home",
+        "ppg",
+        "games",
+        "missed",
+        "ytd_miss",
+        "tgt_rec",
+        "tgt_base",
+        "car_rec",
+        "car_base",
+        "rz_rec",
+        "rz_base",
+        "snap_rec",
+        "snap_base",
+        "vacancy",
+        "use_miss"
+      ]
+    }
+  ],
+  "next_action": "Only run the first factor that improves an out-of-sample league policy and is available at the decision time."
+}
