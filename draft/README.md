@@ -307,6 +307,19 @@ holds in all six seasons is Questionable players: ranked as if they'll play, the
 roughly 2.5 points per decision, but only before inactives are announced. `lineup.py`
 already discounts Questionable players by how often they play.
 
+**Knowing which players a platform's room will leave you doesn't help either.** A 2026
+Reddit post argues that drafters anchor on their platform's default list, so a player
+consensus likes but the platform buries can be waited on. `platform_ranks.py` recovers
+ESPN and Sleeper ADP for 2021-25 from FantasyPros' ADP-by-site table (platform ADP, not
+the default lists themselves, which couldn't be found). `sim_platformranks.py` has the
+opponents draft off that platform order with the usual noise, and gives the test seat
+consensus values plus a one-pick lookahead on the room's order: take someone the room
+will take now, and the consensus favourite at the next pick (`prereg_platformranks.md`).
+It fails in both designs. All-play moves −0.0 points with noisy opponents and −0.2 with
+exact ones, and title odds −0.3 and +0.3. The seat waits 0.4-1.9 times a draft, and
+80-84% of the players it waits on do come back to it. But what it takes in the meantime
+is only a few consensus places worse than the favourite, so the rosters barely change.
+
 So the tools now build on consensus. `lineup.py` sets start/sit from weekly consensus
 ranks, and `trade.py` values players by consensus rest-of-season ranks (`--values model`
 for the old behaviour). Our model supplies what consensus doesn't: availability,
