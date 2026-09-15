@@ -243,6 +243,16 @@ and 1.6 of title odds with noisy opponents, 2.0 and 1.2 with exact ones, positiv
 five seasons in both (`prereg_streaming.md`). It makes about two such moves a season,
 each worth 6-8 lineup points that week. Same signal as consensus, better decision.
 
+**Grabbing next week's or the week after's fill early doesn't add to that.** Streaming
+waits until a hole is one week away, and in the harness the player who would fill it is
+already on another team about half the time by then. A seat that also pre-acquires the
+fill for a bye one or two weeks ahead (`sim_lookahead.py`, `prereg_lookahead.md`) wins
+that race but gains nothing: with a one-week horizon all-play moves +0.0 (noisy
+opponents) and -0.2 points (exact), and with two weeks +0.2 and -0.3, with title odds down
+0.7-1.4 points against exact opponents. Neither horizon passes in both designs. A third
+to a half of the early adds no longer cover a hole when the week comes, and each one
+costs the week's only move.
+
 **Draft structure on top of consensus doesn't clear the bar either.** Three rules keep
 the exact consensus order and only limit which positions the seat takes when, with the
 streaming wire in every arm (`sim_draftstruct.py`, `prereg_draftstruct.md`). Waiting on
