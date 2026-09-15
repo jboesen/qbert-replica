@@ -342,6 +342,17 @@ It fails in both designs. All-play moves −0.0 points with noisy opponents and 
 exact ones, and title odds −0.3 and +0.3. The seat waits 0.4-1.9 times a draft, and
 80-84% of the players it waits on do come back to it. But what it takes in the meantime
 is only a few consensus places worse than the favourite, so the rosters barely change.
+**Trading for your own lineup beats streaming alone, against opponents who accept any fair
+offer.** Two managers who price every player the same can both gain from a trade, because
+a fourth receiver is worth little to one team and a lot to a team whose tight end is out.
+`sim_trades.py` adds a trade each week (weeks 3-11) on top of streaming: the 1-for-1 or
+2-for-1 that most raises the seat's rest-of-season starting lineup, among offers the
+opponent accepts on consensus value alone (`prereg_trades.md`). Real Sleeper trades set the
+acceptance rule: accepters took a median 0.81 of the consensus value they gave, so no
+premium is required. It passes in both designs, +3.5 and +4.8 points of all-play over
+streaming, positive in 4 of 5 seasons; title odds are noisy (+0.4 and +2.5). It's an upper
+bound: the seat trades about 8 times a season against opponents who accept every fair
+offer, while real teams trade 0.4 times a season.
 
 So the tools now build on consensus. `lineup.py` sets start/sit from weekly consensus
 ranks, and `trade.py` values players by consensus rest-of-season ranks (`--values model`

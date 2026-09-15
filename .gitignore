@@ -5,3 +5,4 @@ __pycache__/
 .DS_Store
 data/kalshi_raw/
 data/sleeper_faab_raw/
+data/sleeper_trades_raw/
