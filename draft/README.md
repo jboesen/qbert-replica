@@ -273,6 +273,26 @@ with exact ones, but only in 3 of 5 seasons in the noisy design, so it fails the
 (`prereg_handcuffs.md`). The stashes do start: about eight starts and 90-100 lineup
 points a season, against about two starts for handcuffs behind the seat's own backs,
 which add nothing. The gain comes from seasons with many lead-back absences.
+
+**Playing the rivals instead of the roster loses.** Every policy above reads one roster,
+its own, though the harness publishes what a league publishes: all twelve rosters, the
+standings, the waiver order they imply, and the wire. A seat that spends its spare weeks
+on the rival directly above it in the standings — taking the free agent who would most
+raise *that* rival's rest-of-season starting lineup, since waiver order is reverse
+standings and so the team one seed ahead always claims after you — loses 0.6 points of
+all-play with noisy opponents and 1.7 with exact ones, negative in four of five seasons in
+both, with title odds down 0.3 and 1.6 (`sim_blocking.py`, `prereg_blocking.md`). The
+blocks are not misfires: they deny a mean 17-19 projected lineup points and the blocked
+player would have started for the target about half the time. The arithmetic is what beats
+them. All-play scores you against all eleven rivals, so a point denied to one is worth a
+eleventh, while the roster spot is paid in full — and the player who fits the rival's
+roster is by construction one you don't need, usually a second quarterback, displacing the
+bench depth that hole-aware streaming exists to use. Choosing among already-accepted
+trades by what the other side *won't* start is close to free (all-play -0.2 and -0.3,
+title +0.7 and -0.6) and halves the projected gain handed to the receiving rival, but
+buys nothing reliable. Blocking and streaming compete for the same weekly move, and
+streaming is the better use of it.
+
 **Bidding just enough on FAAB waivers doesn't beat bidding like the league.** Many
 leagues run blind-bid budgets instead of priority waivers. `sleeper_faab.py` pulled
 every waiver claim from 887 real 12-team redraft PPR FAAB leagues on Sleeper (2023-25,
