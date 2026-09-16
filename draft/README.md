@@ -390,6 +390,27 @@ offers are common: the seat has one in about
 nine weeks of ten, and hundreds of them on week-3 rosters. The harness still assumes an
 opponent accepts whatever his own projections favour, which a real manager won't always do.
 
+**Letting the seat read its own situation doesn't add anything on top of that.** Every
+policy here is stationary: the same trade bar in week 3 and week 11, the same waiver move
+at 1-5 and at 5-1. `sim_situation.py` makes both situational (`prereg_situation.md`). The
+10-point trade bar is scaled by weeks remaining, so it stays a constant 0.67 projected
+points per remaining week. Playoff odds are estimated at each decision from games already
+played plus a Monte Carlo of the weeks left, with the spread fitted on earlier seasons
+only; a seat above 25% halves its trade bar and prefers the higher-floor free agent among
+near-equal adds, a seat below it doubles the bar and prefers the higher-upside one. The
+combined arm fails in both designs: all-play -0.4 points with noisy opponents (positive in
+2 of 5 seasons) and -0.5 with exact ones (1 of 5). The diagnostics say why. Two trades a
+season are already spent by week 5 in nine seat-seasons out of ten, so a bar that softens
+later has almost nothing left to decide; and playoff odds three to five weeks into a
+season where six of twelve teams qualify are nearly uninformative, with only 4% (noisy)
+and 26% (exact) of trade decisions made as a seller, so the odds tilt degenerates into a
+uniformly lower bar, which takes trades earlier and worse (median projected gain 19.7 down
+to 16.4). The waiver tilt is the part that clearly hurts: it changes two adds in three,
+almost all on bench spots with no hole to fill, and the lower-valued add fails consensus's
+own "add must beat the drop" test often enough to cost the seat 1.7 moves a season.
+Scaling the bar alone is worth about +0.1 points of all-play and passes only with noisy
+opponents.
+
 So the tools now build on consensus. `lineup.py` sets start/sit from weekly consensus
 ranks, and `trade.py` values players by consensus rest-of-season ranks (`--values model`
 for the old behaviour). Our model supplies what consensus doesn't: availability,
@@ -416,6 +437,7 @@ consensus move when there's nothing to fill.
 .venv/bin/python draft/sim_draftstruct.py --noise 1  # draft structure on consensus: late QB/TE, template, reactive (prereg_draftstruct.md)
 
 .venv/bin/python draft/sim_handcuffs.py --noise 1  # streaming plus a cross-team RB stash (prereg_handcuffs.md)
+.venv/bin/python draft/sim_situation.py --noise 1  # trades and waivers that read weeks left and playoff odds (prereg_situation.md)
 .venv/bin/python draft/stack.py              # model + consensus season stack, fit 2020-22, checked 2023-25
 .venv/bin/python draft/adp.py                # historical ADP, for the market-signal test (prereg_adp.md)
 .venv/bin/python draft/lineup.py --mine "..." # this week's start/sit, by consensus
