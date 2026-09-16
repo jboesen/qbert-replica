@@ -1,0 +1,1082 @@
+<title>Out-Managing Consensus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f1f4f3;
+  --surface: #fbfcfb;
+  --ink: #111a20;
+  --ink-2: #47535b;
+  --muted: #7c878f;
+  --rule: #dbe1df;
+  --grid: #e8ecea;
+  --axis: #9aa4a9;
+  --good: #0ca30c;
+  --good-ink: #0a6f22;
+  --zone-a: 0.16;
+  --zone-b: 0.05;
+  --chip: #e8edeb;
+  --ref: #858f95;
+  --c-waivers: #2a78d6;
+  --c-forecasting: #eb6834;
+  --c-draft: #1baf7a;
+  --c-lineups: #eda100;
+  --c-markets: #e87ba4;
+  --shadow: 0 1px 2px rgba(17, 26, 32, 0.05), 0 12px 32px -12px rgba(17, 26, 32, 0.14);
+  --tt-bg: #ffffff;
+  --display: "Big Shoulders Display", "Arial Narrow", "Roboto Condensed", Impact, sans-serif;
+  --body: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0d1214;
+    --surface: #131a1d;
+    --ink: #edf2f0;
+    --ink-2: #a8b2b6;
+    --muted: #748087;
+    --rule: #253034;
+    --grid: #1c2528;
+    --axis: #56626a;
+    --good: #2fcf4f;
+    --good-ink: #6fe08a;
+    --zone-a: 0.14;
+    --zone-b: 0.03;
+    --chip: #1a2226;
+    --ref: #7d888e;
+    --c-waivers: #3987e5;
+    --c-forecasting: #d95926;
+    --c-draft: #199e70;
+    --c-lineups: #c98500;
+    --c-markets: #d55181;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
+    --tt-bg: #1a2226;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d1214;
+  --surface: #131a1d;
+  --ink: #edf2f0;
+  --ink-2: #a8b2b6;
+  --muted: #748087;
+  --rule: #253034;
+  --grid: #1c2528;
+  --axis: #56626a;
+  --good: #2fcf4f;
+  --good-ink: #6fe08a;
+  --zone-a: 0.14;
+  --zone-b: 0.03;
+  --chip: #1a2226;
+  --ref: #7d888e;
+  --c-waivers: #3987e5;
+  --c-forecasting: #d95926;
+  --c-draft: #199e70;
+  --c-lineups: #c98500;
+  --c-markets: #d55181;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
+  --tt-bg: #1a2226;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-inline: clamp(16px, 4vw, 48px);
+  padding-block: clamp(28px, 5vw, 64px) 56px;
+  display: grid;
+  gap: clamp(22px, 3vw, 34px);
+}
+.wrap > *, .card > * { min-width: 0; }
+
+/* Header */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.eyebrow b { color: var(--ink-2); font-weight: 500; }
+h1 {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(34px, 4.8vw, 62px);
+  line-height: 0.94;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+  margin: 10px 0 0;
+  text-wrap: balance;
+  max-width: 26ch;
+}
+h1 .soft { color: var(--muted); }
+.sub {
+  margin: 14px 0 0;
+  font-size: clamp(16px, 1.9vw, 20px);
+  color: var(--ink-2);
+  max-width: 60ch;
+}
+.tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin-top: 18px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.tally span { display: inline-flex; align-items: baseline; gap: 7px; }
+.tally strong {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.tally .is-pass strong { color: var(--good-ink); }
+
+/* Method strip */
+.method {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.method li {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 2px 10px;
+  align-items: start;
+  padding: 14px 14px 14px 0;
+}
+.method li + li { padding-left: 14px; border-left: 1px solid var(--rule); }
+.method svg { grid-row: span 2; width: 28px; height: 28px; color: var(--ink-2); margin-top: 2px; }
+.method .p { font-weight: 600; font-size: 14px; line-height: 1.3; }
+.method .s { font-family: var(--mono); font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+
+/* Chart card */
+.card {
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: clamp(16px, 2.6vw, 30px);
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+}
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  background: var(--chip);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg button {
+  font: 600 13px/1 var(--body);
+  color: var(--ink-2);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+button:focus-visible, .pt:focus-visible { outline: 2px solid var(--c-waivers); outline-offset: 2px; }
+.read {
+  font-size: 13.5px;
+  color: var(--muted);
+  margin: 0;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  align-items: center;
+}
+.legend .grp { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.legend .k {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.legend .it { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.legend svg { overflow: visible; }
+
+.plot { position: relative; min-width: 0; }
+.plot svg.chart { display: block; width: 100%; overflow: visible; touch-action: manipulation; }
+
+/* SVG styling through tokens */
+.chart text { font-family: var(--body); fill: var(--ink-2); }
+.chart .tick { font-family: var(--mono); font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.chart .axt { font-size: 12px; font-weight: 600; fill: var(--ink-2); }
+.chart .gl { stroke: var(--grid); stroke-width: 1; }
+.chart .zl { stroke: var(--axis); stroke-width: 1.25; }
+.chart .kz-stop-a { stop-color: var(--good); stop-opacity: var(--zone-a); }
+.chart .kz-stop-b { stop-color: var(--good); stop-opacity: var(--zone-b); }
+.chart .kz-edge { stroke: var(--good); stroke-opacity: 0.35; stroke-width: 1; fill: none; stroke-dasharray: 2 4; }
+.chart .ql { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; fill: var(--muted); }
+.chart .ql.keep { fill: var(--good-ink); font-weight: 500; }
+.chart .lab {
+  font-size: 12px;
+  font-weight: 500;
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.chart .lab.strong { font-weight: 700; }
+.chart .lab.refl { fill: var(--ink-2); font-style: italic; }
+.lab-layer { transition: opacity 0.25s; }
+.lab-layer.hide { opacity: 0; }
+
+.pt { cursor: pointer; transition: transform 0.75s cubic-bezier(0.22, 0.8, 0.24, 1), opacity 0.2s; outline: none; }
+.no-anim .pt { transition: none; }
+.pt .shape { stroke: var(--surface); stroke-width: 1.5; fill-opacity: 0.92; transition: transform 0.2s; }
+.pt .hit { fill: transparent; stroke: none; }
+.fam-waivers .shape, .sw.fam-waivers { fill: var(--c-waivers); }
+.fam-forecasting .shape, .sw.fam-forecasting { fill: var(--c-forecasting); }
+.fam-draft .shape, .sw.fam-draft { fill: var(--c-draft); }
+.fam-lineups .shape, .sw.fam-lineups { fill: var(--c-lineups); }
+.fam-markets .shape, .sw.fam-markets { fill: var(--c-markets); }
+.fam-ref .shape { fill: var(--surface); stroke: var(--ref); stroke-width: 2; fill-opacity: 1; }
+.ring { fill: none; stroke: var(--ink); }
+.ring.pass { stroke-width: 2.5; }
+.ring.near { stroke-width: 1.75; stroke-dasharray: 3.5 3; }
+.halo { fill: none; stroke: var(--good); stroke-width: 7; opacity: 0.45; }
+.chart.focus .pt { opacity: 0.28; }
+.chart.focus .pt.on { opacity: 1; }
+.pt.on .shape { transform: scale(1.12); }
+@media (prefers-reduced-motion: reduce) {
+  .pt, .pt .shape, .lab-layer { transition: none; }
+}
+
+/* Tooltip */
+.tt {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: min(310px, calc(100% - 8px));
+  background: var(--tt-bg);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 14px 15px 13px;
+  font-size: 13px;
+  line-height: 1.4;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.16s, transform 0.16s;
+}
+.tt.show { opacity: 1; transform: none; }
+.tt .fam { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.tt .nm { font-weight: 700; font-size: 15px; margin-top: 4px; line-height: 1.25; }
+.tt .what { color: var(--ink-2); margin-top: 4px; }
+.tt table { width: 100%; border-collapse: collapse; margin-top: 10px; font-variant-numeric: tabular-nums; }
+.tt th, .tt td { padding: 3px 0; text-align: right; font-weight: 400; }
+.tt th:first-child { text-align: left; color: var(--muted); }
+.tt thead th { font-family: var(--mono); font-size: 10.5px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 1px solid var(--rule); }
+.tt td { font-family: var(--mono); font-size: 12.5px; }
+.tt tbody tr + tr td, .tt tbody tr + tr th { border-top: 1px solid var(--grid); }
+.tt .vd { display: flex; gap: 8px; align-items: baseline; margin-top: 10px; }
+.pill {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.pill.pass { border-color: var(--good); color: var(--good-ink); }
+.pill.near { border-style: dashed; border-color: var(--ink-2); color: var(--ink); }
+.tt .take { color: var(--ink); }
+
+/* Chip rows */
+.rowhead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.rowhead h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 22px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.rowhead p { margin: 0; font-size: 13px; color: var(--muted); }
+.chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.chip {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 11px 13px;
+  display: grid;
+  gap: 3px;
+}
+.chip b { font-size: 13.5px; font-weight: 600; }
+.chip span { font-size: 12.5px; color: var(--ink-2); line-height: 1.4; }
+.chip .n { font-family: var(--mono); font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.soon { display: flex; flex-wrap: wrap; gap: 8px; }
+.soon span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px dashed var(--axis);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.soon span::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-lineups);
+  animation: pulse 1.8s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .soon span::before { animation: none; } }
+
+details.nums { border-top: 1px solid var(--rule); padding-top: 12px; }
+details.nums summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.tablewrap { overflow-x: auto; margin-top: 12px; }
+.tablewrap table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.tablewrap th, .tablewrap td { padding: 6px 10px; border-bottom: 1px solid var(--grid); text-align: right; white-space: nowrap; }
+.tablewrap th:first-child, .tablewrap td:first-child, .tablewrap th:nth-child(2), .tablewrap td:nth-child(2) { text-align: left; }
+.tablewrap thead th { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.tablewrap td { font-family: var(--mono); }
+.tablewrap td:first-child { font-family: var(--body); font-weight: 500; }
+.flow { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow); padding: 14px 16px 10px; margin: 0; }
+.flow svg { display: block; width: 100%; max-width: 100%; height: auto; color: var(--ink); }
+.flow figcaption { font-size: 12px; color: var(--muted); margin-top: 8px; max-width: 90ch; }
+.dg-box { fill: var(--chip); stroke: var(--rule); stroke-width: 1; }
+.dg-hold { fill: none; stroke: var(--axis); stroke-width: 1; stroke-dasharray: 5 4; }
+.dg-rand { fill: none; stroke: var(--c-waivers); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.dg-pass { fill: none; stroke: var(--good); stroke-width: 1.4; }
+.dg-t { fill: var(--ink); font-family: var(--body); font-size: 13px; font-weight: 600; }
+.dg-s { fill: var(--ink-2); font-family: var(--body); font-size: 11.5px; }
+.dg-k { fill: var(--muted); font-family: var(--body); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.dg-a { fill: var(--muted); font-family: var(--body); font-size: 11px; }
+.dg-line { stroke: var(--axis); stroke-width: 1.3; fill: none; }
+.dg-rline { stroke: var(--c-waivers); stroke-width: 1.3; fill: none; }
+
+.foot { font-size: 12px; color: var(--muted); margin: 0; max-width: 90ch; }
+
+@media (max-width: 900px) {
+  .method { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .method li, .method li + li { padding: 12px 10px 12px 0; border-left: 0; }
+  .method li:nth-child(n+2) { border-top: 0; }
+}
+@media (max-width: 520px) {
+  .method { grid-template-columns: 1fr; }
+  .method li { padding: 10px 0; }
+  .method li + li { border-top: 1px solid var(--grid); }
+  .seg button { padding: 8px 11px; font-size: 12.5px; }
+}
+</style>
+
+<main class="wrap">
+  <header>
+    <div class="eyebrow"><b>Fantasy football research</b><span>12-team PPR</span><span>2021-25 seasons</span><span>Pass bar set before testing</span></div>
+    <h1>Start with the experts&rsquo; rankings. <span class="soft">What can you add on top?</span></h1>
+    <p class="sub">Each dot is one extra strategy added on top of the FantasyPros expert rankings, tested on the 2021-25 seasons against teams that just draft and start players by those rankings.</p>
+    <div class="tally" aria-label="Results tally">
+      <span><strong>20</strong>strategies tested</span>
+      <span class="is-pass"><strong>3</strong>clearly won more</span>
+      <span><strong>1</strong>close call</span>
+    </div>
+  </header>
+
+  <ul class="method" aria-label="How we tested">
+    <li>
+      <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="5" width="22" height="18" rx="2"/><path d="M14 5v18M3 14h22"/><circle cx="14" cy="14" r="3"/></svg>
+      <span class="p">Simulated 12-team leagues</span>
+      <span class="s">real 2021-25 player scoring, 20 drafts, 20 schedules each</span>
+    </li>
+    <li>
+      <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="9" cy="10" r="3"/><circle cx="19" cy="10" r="3"/><path d="M3.5 22c0-3.3 2.5-6 5.5-6s5.5 2.7 5.5 6M13.5 22c0-3.3 2.5-6 5.5-6s5.5 2.7 5.5 6"/></svg>
+      <span class="p">11 teams just follow the experts</span>
+      <span class="s">for their draft, lineups and waivers</span>
+    </li>
+    <li>
+      <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="6" cy="8" r="2"/><circle cx="14" cy="8" r="2"/><circle cx="22" cy="8" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="22" cy="18" r="2"/><circle cx="14" cy="18" r="3.6" fill="currentColor"/></svg>
+      <span class="p">One team adds one strategy</span>
+      <span class="s">compared to a normal team in the same league and schedule</span>
+    </li>
+    <li>
+      <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="6" y="12" width="16" height="12" rx="2"/><path d="M9.5 12V8.5a4.5 4.5 0 0 1 9 0V12"/><path d="M11 18l2.2 2.2L17.5 16"/></svg>
+      <span class="p">Pass bar set before testing</span>
+      <span class="s">wins more in 4 of 5 seasons, title odds drop no more than 1 point</span>
+    </li>
+    <li>
+      <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 9h11M4 19h20"/><circle cx="19" cy="9" r="4"/><circle cx="19" cy="9" r="1.2" fill="currentColor"/><path d="M15 17.5c1 1 2 1.5 4 1.5s3-.5 4-1.5" stroke-dasharray="1.5 2"/></svg>
+      <span class="p">Must work against two kinds of rivals</span>
+      <span class="s">rivals who stick exactly to the rankings, and rivals who stray a bit like real people</span>
+    </li>
+  </ul>
+
+  <section class="card" aria-labelledby="chart-title">
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Chart axes">
+        <button type="button" id="view-a" data-view="a" aria-pressed="true">Realistic vs strict rivals</button>
+        <button type="button" id="view-b" data-view="b" aria-pressed="false">Weekly wins vs title odds</button>
+        <button type="button" id="view-c" data-view="c" aria-pressed="false">Weekly wins vs how often it worked</button>
+      </div>
+      <p class="read" id="chart-title">How to read this: each dot is one strategy compared with the team it was tested against &mdash; a plain follow-the-rankings team, or, for strategies that build on an earlier winner, that winner. Further up and right means it won more often. Bigger dots helped in more seasons.</p>
+    </div>
+    <div class="legend" aria-label="Legend">
+      <div class="grp"><span class="k">Family</span>
+        <span class="it"><svg width="12" height="12" viewBox="-6 -6 12 12"><path class="sw fam-waivers" d="M-5,0a5,5 0 1,0 10,0a5,5 0 1,0 -10,0Z"/></svg>Waivers &amp; trades</span>
+        <span class="it"><svg width="12" height="12" viewBox="-6 -6 12 12"><path class="sw fam-draft" d="M-4.5,-4.5H4.5V4.5H-4.5Z"/></svg>Draft</span>
+        <span class="it"><svg width="12" height="12" viewBox="-6 -6 12 12"><path class="sw fam-markets" d="M0,-5.6L5.2,3.4L-5.2,3.4Z"/></svg>Draft market (ADP)</span>
+        <span class="it"><svg width="12" height="12" viewBox="-6 -6 12 12"><path class="sw fam-forecasting" d="M0,5.6L5.2,-3.4L-5.2,-3.4Z"/></svg>Our own rankings</span>
+        <span class="it"><svg width="12" height="12" viewBox="-6 -6 12 12"><path class="sw fam-lineups" d="M5.2,0L2.6,4.5L-2.6,4.5L-5.2,0L-2.6,-4.5L2.6,-4.5Z"/></svg>Lineups</span>
+      </div>
+      <div class="grp"><span class="k">Verdict</span>
+        <span class="it"><svg width="18" height="18" viewBox="-9 -9 18 18"><circle r="7" style="fill:none;stroke:var(--good);stroke-width:5;opacity:.45"/><circle r="7" style="fill:none;stroke:var(--ink);stroke-width:2.2"/><circle r="4" style="fill:var(--muted)"/></svg>Worked</span>
+        <span class="it"><svg width="18" height="18" viewBox="-9 -9 18 18"><circle r="7" style="fill:none;stroke:var(--ink);stroke-width:1.6;stroke-dasharray:3 2.6"/><circle r="4" style="fill:var(--muted)"/></svg>Close call</span>
+        <span class="it"><svg width="18" height="18" viewBox="-9 -9 18 18"><circle r="4" style="fill:var(--muted)"/></svg>Didn&rsquo;t work</span>
+        <span class="it"><svg width="18" height="18" viewBox="-9 -9 18 18"><path d="M0,-6L6,0L0,6L-6,0Z" style="fill:var(--surface);stroke:var(--ref);stroke-width:1.8"/></svg>For comparison only</span>
+      </div>
+      <div class="grp"><span class="k">Dot size</span>
+        <span class="it"><svg width="44" height="22" viewBox="0 -11 44 22"><circle cx="4" r="4" style="fill:var(--muted)"/><circle cx="15" r="6.5" style="fill:var(--muted)"/><circle cx="33" r="9.5" style="fill:var(--muted)"/></svg>how often it helped, out of 10 tries</span>
+      </div>
+    </div>
+    <div class="plot" id="plot">
+      <div class="tt" id="tt" role="status" aria-live="polite"></div>
+    </div>
+    <p class="read" id="view-note">Up and to the right means the strategy won more against both kinds of rivals. Tap a dot for details.</p>
+    <details class="nums">
+      <summary>Show the numbers</summary>
+      <div class="tablewrap" id="table"></div>
+    </details>
+  </section>
+
+  <section aria-labelledby="how">
+    <div class="rowhead"><h2 id="how">How a strategy gets tested</h2><p>Real data in, one simulated league, one paired comparison out</p></div>
+    <figure class="flow"><svg viewBox="0 0 1200 570" role="img" aria-label="How the test works: fixed real data and expert rankings feed a simulated league whose only randomness is rival draft shuffles and schedules; every team-season is compared with a matched control team and judged against a pass bar set in advance."><text class="dg-k" x="16" y="26">Inputs, all fixed and real</text><rect class="dg-box" x="16" y="40" width="250" height="66" rx="7"/><text class="dg-t" x="30" y="63">Real weekly points</text><text class="dg-s" x="30" y="81">what every player actually</text><text class="dg-s" x="30" y="96">scored, 2021-25</text><rect class="dg-box" x="16" y="118" width="250" height="80" rx="7"/><text class="dg-t" x="30" y="141">Expert rankings (FantasyPros)</text><text class="dg-s" x="30" y="159">average rank, plus how much</text><text class="dg-s" x="30" y="174">the experts disagree on each</text><text class="dg-s" x="30" y="189">player, as of that week</text><rect class="dg-box" x="16" y="210" width="250" height="66" rx="7"/><text class="dg-t" x="30" y="233">Injuries, byes, rosters</text><text class="dg-s" x="30" y="251">only what was known when</text><text class="dg-s" x="30" y="266">the decision was made</text><rect class="dg-box" x="16" y="288" width="250" height="66" rx="7"/><text class="dg-t" x="30" y="311">Rank &#8594; points curve</text><text class="dg-s" x="30" y="329">fit on earlier seasons only,</text><text class="dg-s" x="30" y="344">so a rank becomes points</text><text class="dg-k" x="320" y="26">One simulated league, played out</text><rect class="dg-hold" x="320" y="40" width="500" height="516" rx="10"/><text class="dg-a" x="336" y="62">repeat: 5 seasons &#215; 20 drafts &#215; 12 seats &#215; each strategy</text><rect class="dg-rand" x="340" y="74" width="460" height="78" rx="7"/><text class="dg-t" x="354" y="97">The only two random draws</text><text class="dg-s" x="354" y="115">12 rival draft orders: rankings shuffled by how much</text><text class="dg-s" x="354" y="130">the experts disagree (strict rivals: no shuffle)</text><text class="dg-s" x="354" y="145">20 random 14-week schedules</text><rect class="dg-box" x="340" y="180" width="460" height="62" rx="7"/><text class="dg-t" x="354" y="203">Draft</text><text class="dg-s" x="354" y="221">12 teams, snake order. Rivals use their shuffled list;</text><text class="dg-s" x="354" y="236">the test team uses one new idea</text><rect class="dg-box" x="340" y="268" width="460" height="62" rx="7"/><text class="dg-t" x="354" y="291">Play weeks 1-14</text><text class="dg-s" x="354" y="309">each team starts its best lineup by the weekly</text><text class="dg-s" x="354" y="324">rankings and scores its players&rsquo; real points</text><rect class="dg-box" x="340" y="356" width="460" height="62" rx="7"/><text class="dg-t" x="354" y="379">Between weeks</text><text class="dg-s" x="354" y="397">waiver pickups, and trades. This is where the</text><text class="dg-s" x="354" y="412">strategy being tested usually differs</text><rect class="dg-box" x="340" y="462" width="460" height="62" rx="7"/><text class="dg-t" x="354" y="485">Weeks 15-17 playoffs</text><text class="dg-s" x="354" y="503">top 6 teams, replayed once for each of the</text><text class="dg-s" x="354" y="518">20 schedules</text><text class="dg-k" x="874" y="26">Outputs and scoring</text><rect class="dg-box" x="874" y="74" width="310" height="78" rx="7"/><text class="dg-t" x="888" y="97">One row per team-season</text><text class="dg-s" x="888" y="115">weekly win rate, title, playoff</text><text class="dg-s" x="888" y="130">spot, wins, points &#8212; for the test</text><text class="dg-s" x="888" y="145">team and its control team</text><rect class="dg-box" x="874" y="180" width="310" height="78" rx="7"/><text class="dg-t" x="888" y="203">Subtract the control</text><text class="dg-s" x="888" y="221">same league, same draft slot,</text><text class="dg-s" x="888" y="236">same schedules, so draft and</text><text class="dg-s" x="888" y="251">schedule luck cancel out</text><rect class="dg-box" x="874" y="286" width="310" height="78" rx="7"/><text class="dg-t" x="888" y="309">Average by season</text><text class="dg-s" x="888" y="327">gives 5 season numbers; a</text><text class="dg-s" x="888" y="342">resample of those 5 gives the</text><text class="dg-s" x="888" y="357">error bars</text><rect class="dg-pass" x="874" y="392" width="310" height="96" rx="7"/><text class="dg-t" x="888" y="415">Pass bar, set in advance</text><text class="dg-s" x="888" y="433">won more overall, helped in 4 of</text><text class="dg-s" x="888" y="448">5 seasons, title odds no worse</text><text class="dg-s" x="888" y="463">than &minus;1 point &#8212; and all of that</text><text class="dg-s" x="888" y="478">against both kinds of rivals</text><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10Z" fill="var(--axis)"/></marker><marker id="arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10Z" fill="var(--c-waivers)"/></marker></defs><path class="dg-line" d="M266,73 H296"/><path class="dg-line" d="M266,243 H296"/><path class="dg-line" d="M266,321 H296"/><path class="dg-line" d="M296,73 V321"/><path class="dg-line" d="M296,300 H316" marker-end="url(#ar)"/><text class="dg-a" x="252" y="350" text-anchor="end">players, prices, real points</text><path class="dg-rline" d="M266,158 H286 V110 H336" marker-end="url(#arb)"/><text class="dg-a" x="272" y="103">the disagreement</text><text class="dg-a" x="272" y="117">sets the shuffle</text><path class="dg-line" d="M570,152 V176" marker-end="url(#ar)"/><path class="dg-line" d="M570,242 V264" marker-end="url(#ar)"/><path class="dg-line" d="M570,330 V352" marker-end="url(#ar)"/><path class="dg-line" d="M570,418 V458" marker-end="url(#ar)"/><path class="dg-line" d="M800,387 H818 V299 H806" marker-end="url(#ar)"/><text class="dg-a" x="700" y="440">next week</text><path class="dg-line" d="M820,493 H848 V113 H870" marker-end="url(#ar)"/><text class="dg-a" x="836" y="60">results</text><path class="dg-line" d="M1029,152 V176" marker-end="url(#ar)"/><path class="dg-line" d="M1029,258 V282" marker-end="url(#ar)"/><path class="dg-line" d="M1029,364 V388" marker-end="url(#ar)"/></svg><figcaption>Nothing about player scoring is invented: every point is what that player really scored that week. The only randomness is how the 11 rivals shuffle the rankings when they draft and who plays whom each week, both drawn from a seed fixed by season and draft number, so the test team and its control face identical leagues.</figcaption></figure>
+  </section>
+
+  <section aria-labelledby="outside">
+    <div class="rowhead"><h2 id="outside">Why we start from the experts&rsquo; rankings</h2><p>Checks done outside the simulated leagues</p></div>
+    <div class="chips">
+      <div class="chip"><b>Experts vs our own projections</b><span class="n">WR .64 vs .57 &middot; TE .51 vs .41</span><span>The experts&rsquo; rankings predicted actual scoring better than ours at every position, so they&rsquo;re the right starting point.</span></div>
+      <div class="chip"><b>Adding betting odds (Kalshi), 2025</b><span class="n">21,123 prices &middot; TD odds .36, actual .37</span><span>The betting odds were accurate, but adding them to the expert rankings barely improved predictions.</span></div>
+      <div class="chip"><b>Adding betting odds (Polymarket), weeks 14-17</b><span class="n">accuracy .316 &rarr; .317</span><span>Same result with less data: the rankings already capture what the odds know.</span></div>
+      <div class="chip"><b>Checking the experts for bad habits</b><span class="n">&ldquo;Questionable&rdquo; QBs: &minus;7.8 pts</span><span>They don&rsquo;t overreact to hot streaks. The one flaw: players tagged Questionable score less than their rank, every season.</span></div>
+      <div class="chip"><b>How real leagues bid on waivers</b><span class="n">typical winning bid: 3% of budget</span><span>123,881 real Sleeper claims: two-thirds had only one bidder, and managers spend about 55% of their budget.</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="running">
+    <div class="rowhead"><h2 id="running">Coming next</h2><p>Tested the same way, same pass bar</p></div>
+    <div class="soon">
+      <span>Stacking a QB with his own receiver</span>
+      <span>Rivals who turn down most offers</span>
+    </div>
+  </section>
+
+  <p class="foot">Every strategy is compared to a normal team in the identical league, draft slot and schedule, averaged over 1,200 matched team pairs for each kind of rival (20 drafts, 12 teams, 5 seasons, 20 schedules each). Weekly win rate is the record you&rsquo;d have if you played every other team every week, so a lucky or unlucky schedule doesn&rsquo;t count. Numbers are percentage points of change. Realistic rivals stray from the rankings a bit, like real people; strict rivals follow them exactly. A second AI reviewer checked the test design before anything ran.</p>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  // Paired differences, percentage points. n = noisy-consensus opponents, x = exact-consensus opponents.
+  // [all-play change, title change, [all-play change by season 2021..2025]]
+  var D = {"draft_model":{"n":[1.66,-3.15,[4.74,9.86,-4.87,-1.4,-0.06]],"x":[-7.76,-7.58,[-4.87,1.35,-13.8,-11.58,-9.9]]},"lineup_model":{"n":[-1.75,-0.76,[-1.13,-2.22,-2.77,-1.29,-1.33]],"x":[-1.34,-2.01,[-0.11,-2.71,-1.73,0.43,-2.6]]},"blend":{"n":[2.56,-0.79,[6.21,4.29,-1.71,3.91,0.09]],"x":[6.12,-0.1,[18.78,14.23,-1.19,-0.16,-1.08]]},"market":{"n":[-6.38,-5.54,[-19.62,-5.7,-0.05,-0.16,-6.36]],"x":[-1.76,-1.47,[-15.37,3.95,6.55,-1.41,-2.54]]},"market_stack":{"n":[-2.17,1.18,[-11.33,-0.96,1.13,1.6,-1.29]],"x":[0.72,4.6,[-11.74,4.22,4.44,-0.59,7.3]]},"adp":{"n":[-4.47,-6.13,[-8.01,-6.23,-2.38,-2.49,-3.25]],"x":[-7.79,-5.29,[-10.28,-5.03,-10.34,-4.76,-8.55]]},"adp_gap":{"n":[-6.34,-6.98,[-23.0,-5.06,-4.12,4.15,-3.65]],"x":[-0.55,0.55,[-21.75,13.58,-3.25,8.82,-0.16]]},"exact_vs_noisy":{"n":[8.47,9.21,[8.69,12.59,7.27,7.02,6.77]],"x":[-0.9,-0.69,[0.0,-3.9,-0.59,0.0,0.0]]},"hindsight":{"n":[15.27,18.64,[15.86,15.12,14.22,16.06,15.05]],"x":[16.54,16.21,[16.83,15.69,17.21,17.91,15.04]]},"usage":{"n":[-3.57,-5.13,[-5.5,-4.69,2.77,-5.94,-4.47]],"x":[-3.48,-3.01,[-3.19,-6.49,-0.16,-3.08,-4.49]]},"solo":{"n":[2.9,9.35,[5.01,0.42,8.06,1.04,-0.02]],"x":[5.35,5.79,[6.6,2.17,15.53,3.3,-0.87]]},"stream":{"n":[1.03,1.55,[1.15,0.83,1.57,0.56,1.04]],"x":[2.04,1.15,[2.71,1.79,3.52,0.65,1.51]]},"winprob":{"n":[-0.01,-0.02,[-0.01,-0.02,-0.02,-0.02,-0.01]],"x":[-0.02,0.0,[-0.05,-0.04,-0.05,0.03,-0.01]]},"look2":{"n":[0.02,0.05,[-0.17,-0.02,-0.01,0.36,-0.04]],"x":[-0.21,-1.36,[-1.51,0.27,0.87,0.27,-0.92]]},"look3":{"n":[0.18,0.19,[-0.09,0.25,0.26,0.43,0.05]],"x":[-0.26,-0.74,[-0.7,-0.27,-0.05,0.43,-0.7]]},"late_qb_te":{"n":[-2.52,-2.05,[-0.95,-6.9,-2.16,-1.97,-0.6]],"x":[-1.42,0.65,[-7.2,-3.19,1.35,1.35,0.59]]},"template":{"n":[0.63,-0.23,[-0.17,-0.05,0.05,2.42,0.91]],"x":[0.74,0.66,[-0.16,0.7,0.49,2.0,0.65]]},"reactive":{"n":[0.25,0.66,[-0.1,0.55,1.09,-0.21,-0.06]],"x":[0.0,0.0,[0.0,0.0,0.0,0.0,0.0]]},"avail":{"n":[-0.01,-0.34,[0.28,-0.4,0.06,-0.14,0.15]],"x":[-0.24,0.3,[0.0,-0.43,4.46,-3.68,-1.54]]},"cross":{"n":[0.78,0.61,[3.21,0.97,-0.47,0.9,-0.71]],"x":[1.62,1.87,[3.68,0.05,-0.76,4.98,0.16]]},"own":{"n":[0.01,-0.02,[0.29,0.02,-0.04,-0.15,-0.06]],"x":[-0.14,-1.18,[-0.59,0.05,0.43,0.05,-0.65]]},"faab":{"n":[-0.41,1.3,[-1.43,-0.51,0.94,-0.92,-0.15]],"x":[0.39,2.42,[-0.41,1.03,1.49,-0.62,0.48]]},"trades":{"n":[3.51,0.43,[3.6,5.5,-0.2,6.3,2.3]],"x":[4.76,2.52,[8.8,8.3,1.5,7.5,-2.2]]},"tradecap":{"n":[1.09,-0.69,[0.3,1.0,1.2,1.4,1.5]],"x":[1.88,3.61,[3.4,2.5,-3.4,4.3,2.7]]},"blocking":{"n":[-0.63,-0.28,[-1.1,-0.7,0.6,-0.8,-1.2]],"x":[-1.72,-1.58,[-3.1,-1.1,0.2,-2.9,-1.7]]},"situation":{"n":[-0.37,-0.35,[0.9,-0.8,-1.4,0.0,-0.6]],"x":[-0.48,-0.88,[-1.1,-2.3,5.2,-2.0,-2.2]]},"mustwin":{"n":[-0.01,0.0,[0.0,0.0,-0.04,0.01,-0.01]],"x":[-0.02,-0.01,[-0.08,-0.01,-0.01,0.0,-0.01]]}};
+
+  var FAM = {
+    waivers: { label: "Waivers & trades", shape: "circle" },
+    draft: { label: "Draft", shape: "square" },
+    markets: { label: "Draft market (ADP)", shape: "tri" },
+    forecasting: { label: "Our own rankings", shape: "tridown" },
+    lineups: { label: "Lineups", shape: "hex" },
+    ref: { label: "For comparison only", shape: "diamond" }
+  };
+
+  var META = [
+    { k: "mustwin", fam: "lineups", v: "fail", name: "Go boom-or-bust when you must win", short: "Must-win risk",
+      what: "Aim the lineup at the team you actually play that week, going riskier as a big underdog and safer as a favorite, scaled by how much the game swings your playoff odds.",
+      take: "There is no risk to buy: the players who score most also swing most, so the highest-projected lineup is already close to the riskiest one. The lineup changed in under 1% of weeks." },
+    { k: "situation", fam: "waivers", v: "fail", name: "Trade and pick up based on your record", short: "Play your record",
+      what: "Lower the bar for a trade when you're in the race or the season is short, raise it when you're out, and favor safe or risky pickups to match.",
+      take: "Nothing to decide: teams spend both trades by week 5, when nobody's playoff odds mean much yet. The record-based pickup rule cost 1.7 moves a season." },
+    { k: "blocking", fam: "waivers", v: "fail", name: "Take players to deny your closest rival", short: "Block your rival",
+      what: "In a week with no hole of your own, use the pickup on the player who would most help the team just ahead of you, instead of the one who helps you.",
+      take: "Backfired in both: the blocked player would have started for them about half the time, but you spend your one weekly move and a bench spot, and lose the pickup you needed later." },
+    { k: "tradecap", fam: "waivers", v: "pass", name: "Fill lineup holes + 2 win-win trades a season", short: "Holes + 2 trades",
+      what: "Fill lineup holes, plus at most 2 trades a season, each worth 10+ projected lineup points to you and not hurting the other team's lineup.",
+      take: "The realistic version still works: measured against filling holes alone, it won more in every season vs realistic rivals. About 2 trades a season is a busy manager, not a typical one." },
+    { k: "trades", fam: "waivers", v: "pass", name: "Fill lineup holes + trade for lineup fit", short: "Holes + trades",
+      what: "On top of filling lineup holes, each week from 3 to 11 offer the fair-by-rankings trade that most improves your starting lineup, like a spare RB for the WR you're missing.",
+      take: "The biggest gain over filling holes alone, but optimistic: rivals accept any fair offer, even ones that hurt their own lineup, so the team traded about 8 times a season. Real teams trade less than once." },
+    { k: "stream", fam: "waivers", v: "pass", name: "Fill next week's empty lineup spots", short: "Fill lineup holes",
+      what: "Instead of grabbing the best available player, add whoever fills next week's empty starting spot (a bye, an injury, a cut player).",
+      take: "The first strategy that clearly worked: it won more in every season against both kinds of rivals, from about 2 pickups a year worth 6 to 8 points each." },
+    { k: "cross", fam: "waivers", v: "near", name: "Stash other teams' backup RBs", short: "Other teams' RB backups",
+      what: "On top of filling lineup holes, stash up to two backup running backs from other NFL teams when your bench has room.",
+      take: "Close call: it beat strict rivals, but only helped in 3 of 5 seasons against realistic ones. The stashed backups started about 8 times a season." },
+    { k: "own", fam: "waivers", v: "fail", name: "Stash your own RB's backup", short: "Own RB backup",
+      what: "On top of filling lineup holes, hold the backup to your own running back in case he gets hurt.",
+      take: "Didn't help: you'd start that backup about twice a season, and only after your own starter is already out." },
+    { k: "usage", fam: "waivers", v: "fail", name: "Chase players with rising usage", short: "Chase rising usage",
+      what: "Pick up players getting more targets and carries lately, instead of trusting the experts' rest-of-season rankings.",
+      take: "Backfired: chasing a week or two of extra usage cost about 3.5 points of weekly win rate against both kinds of rivals." },
+    { k: "look2", fam: "waivers", v: "fail", name: "Grab a bye fill 1 week early", short: "Bye fill 1 wk early",
+      what: "Fill lineup holes, but grab next week's bye replacement one week before you need him.",
+      take: "You beat other teams to the player, but it didn't help: the early pickup used up your one move for the week." },
+    { k: "look3", fam: "waivers", v: "fail", name: "Grab a bye fill 2 weeks early", short: "Bye fill 2 wks early",
+      what: "Fill lineup holes, but grab bye replacements up to two weeks before you need them.",
+      take: "No real change against realistic rivals, and slightly worse against strict ones." },
+    { k: "faab", fam: "waivers", v: "fail", name: "Bid just enough on waivers", short: "Smarter waiver bids",
+      what: "In bidding (FAAB) waivers, bid just enough to usually win the player instead of overbidding, and pace the budget.",
+      take: "It won far more of its bids (41-47% instead of 12-14%), but that didn't turn into more wins." },
+    { k: "late_qb_te", fam: "draft", v: "fail", name: "Wait on QB and TE", short: "Late QB and TE",
+      what: "Draft by the expert rankings, but wait until round 9 for a QB and round 8 for a TE.",
+      take: "Waiting cost points: the lineup scored lower most weeks, even with waiver pickups to help." },
+    { k: "template", fam: "draft", v: "fail", name: "RB/WR draft template", short: "RB/WR template",
+      what: "Draft by the expert rankings, but take 2-3 RBs and 3-4 WRs in the first 6 rounds, with at most one QB or TE.",
+      take: "A small gain, but it only helped in 3 of 5 seasons against realistic rivals, so it missed the bar." },
+    { k: "reactive", fam: "draft", v: "fail", name: "React to positional runs", short: "Run-reactive draft",
+      what: "During the draft, favor whichever position the other teams have been passing on.",
+      take: "Nothing to exploit: rivals following the rankings never leave a whole position on the board." },
+    { k: "avail", fam: "draft", v: "fail", name: "Wait on players ESPN/Sleeper rooms leave", short: "Draft-room patterns",
+      what: "Wait on players that real ESPN or Sleeper drafts tend to leave available for your next pick.",
+      take: "Those players usually were still there (80-84% of the time), but the final roster barely changed." },
+    { k: "market", fam: "markets", v: "fail", name: "Time picks to when rivals draft", short: "Time picks to rivals",
+      what: "Value players like the experts, but time each pick around when the other teams are likely to take them.",
+      take: "Backfired against both kinds of rivals, especially in 2021." },
+    { k: "market_stack", fam: "markets", v: "fail", name: "Pick timing, using our blended ranks", short: "Timing + our ranks",
+      what: "The same pick-timing idea, valuing players with a mix of our rankings and the experts'.",
+      take: "Title odds went up, but it only won more in half of the seasons tested, so it missed the bar." },
+    { k: "adp", fam: "markets", v: "fail", name: "Draft by average draft position", short: "Draft by ADP",
+      what: "Draft by ADP, where real drafters actually take players, instead of the expert rankings.",
+      take: "Clearly worse: title odds fell 5 to 6 points, and it won less in every season." },
+    { k: "adp_gap", fam: "markets", v: "fail", name: "Wait on players ADP says will last", short: "ADP bargains",
+      what: "Value players like the experts, but wait on anyone ADP says will still be there at your next pick.",
+      take: "Backfired against both kinds of rivals; 2021 alone cost over 20 points of weekly win rate." },
+    { k: "draft_model", fam: "forecasting", v: "fail", name: "Our draft board", short: "Our draft board",
+      what: "Draft from our own season point projections instead of the expert rankings.",
+      take: "It took a QB in rounds 1-3 in 58 of 60 drafts and lost title odds against both kinds of rivals." },
+    { k: "blend", fam: "forecasting", v: "fail", name: "Average our ranks with the experts'", short: "Our ranks + experts",
+      what: "Draft by the average of our rankings and the expert rankings.",
+      take: "Only cleared the bar against realistic rivals, mostly thanks to 2021-22, and title odds didn't improve." },
+    { k: "lineup_model", fam: "lineups", v: "fail", name: "Our weekly lineups", short: "Our weekly lineups",
+      what: "Set weekly lineups from our projections instead of the experts' weekly rankings.",
+      take: "Worse than just following the experts' start/sit calls, in every season against realistic rivals." },
+    { k: "winprob", fam: "lineups", v: "fail", name: "Lineups built to win, not score", short: "Win-first lineups",
+      what: "Each week, start the lineup most likely to outscore the most teams, instead of the one with the highest projected points.",
+      take: "Almost never mattered: it picked a different lineup than the experts less than 1% of the time." },
+    { k: "exact_vs_noisy", fam: "ref", v: "ref", name: "Sticking exactly to the rankings", short: "Strict to rankings",
+      what: "Draft exactly by the expert rankings while every other team strays from them a bit, like real people.",
+      take: "About 9 points more title odds against realistic rivals, but mostly because their random mistakes help you, not because it's a clever strategy." },
+    { k: "solo", fam: "ref", v: "ref", name: "Work the wire at all", short: "Work the wire at all",
+      what: "Only your team makes waiver moves all season; the other 11 teams never touch the wire.",
+      take: "Shows what the waiver wire is worth by itself: about 3 to 5 points of weekly win rate." },
+    { k: "hindsight", fam: "ref", v: "ref", name: "Hindsight lineups", short: "Hindsight ceiling",
+      what: "Draft by the expert rankings, but set lineups already knowing how every player will score that week.",
+      take: "The crystal-ball ceiling for start/sit: about 16 points of weekly win rate. Unreachable, but it shows how much room lineups leave." }
+  ];
+
+  var VERDICT = { pass: "Worked", near: "Close call", fail: "Didn't work", ref: "For comparison" };
+
+  function countPos(a) { var c = 0; for (var i = 0; i < a.length; i++) { if (a[i] > 0) c++; } return c; }
+
+  var P = META.map(function (m, i) {
+    var d = D[m.k];
+    return {
+      i: i, k: m.k, fam: m.fam, v: m.v, name: m.name, short: m.short, what: m.what, take: m.take,
+      apN: d.n[0], tiN: d.n[1], apX: d.x[0], tiX: d.x[1],
+      sN: countPos(d.n[2]), sX: countPos(d.x[2]),
+      cons: countPos(d.n[2]) + countPos(d.x[2])
+    };
+  });
+
+  var VIEWS = {
+    a: {
+      x: function (p) { return p.apN; }, y: function (p) { return p.apX; },
+      xt: "Change in weekly win rate vs realistic rivals (pts)",
+      yt: "Change in weekly win rate vs strict rivals (pts)",
+      zoneY: 0,
+      q: { tr: "Worked vs both rival types", tl: "Only vs strict rivals", br: "Only vs realistic rivals", bl: "Lost vs both" },
+      note: "Up and to the right means the strategy won more against both kinds of rivals. Tap a dot for details."
+    },
+    b: {
+      x: function (p) { return (p.apN + p.apX) / 2; }, y: function (p) { return (p.tiN + p.tiX) / 2; },
+      xt: "Change in weekly win rate, both rival types (pts)",
+      yt: "Change in title odds, both rival types (pts)",
+      zoneY: 0,
+      q: { tr: "More wins, better title odds", tl: "Better titles, fewer wins", br: "More wins, worse title odds", bl: "Fewer wins, worse title odds" },
+      note: "Right means more weekly wins; up means better odds of winning the league. Weekly wins are the steadier measure, so they decide the verdict."
+    },
+    c: {
+      x: function (p) { return (p.apN + p.apX) / 2; }, y: function (p) { return p.cons; },
+      xt: "Change in weekly win rate, both rival types (pts)",
+      yt: "Seasons it helped, out of 10 tries",
+      zoneY: 7.5, yFixed: [-0.8, 10.8], yTicks: [0, 2, 4, 6, 8, 10],
+      q: { tr: "Worked, and consistently", tl: "", br: "", bl: "" },
+      note: "Right means more weekly wins; up means it kept helping season after season. Passing needs at least 8 of 10."
+    }
+  };
+
+  var plot = document.getElementById("plot");
+  var tt = document.getElementById("tt");
+  var note = document.getElementById("view-note");
+  var NS = "http://www.w3.org/2000/svg";
+  var state = { view: "a", W: 0, H: 0, m: null, svg: null, ptsEls: [], labTimer: 0, pinned: -1, first: true };
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var measureCtx = document.createElement("canvas").getContext("2d");
+  function textW(s, size, weight) {
+    measureCtx.font = (weight || 500) + " " + size + "px 'Hanken Grotesk', system-ui, sans-serif";
+    return measureCtx.measureText(s).width;
+  }
+  function monoW(s, size) {
+    measureCtx.font = "500 " + size + "px 'IBM Plex Mono', ui-monospace, monospace";
+    return measureCtx.measureText(s).width * 1.02 + s.length * size * 0.08;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function fmt(v, dp) {
+    var f = Math.pow(10, dp);
+    var r = Math.round(v * f) / f;
+    if (r === 0) return (0).toFixed(dp);
+    return (r > 0 ? "+" : "−") + Math.abs(r).toFixed(dp);
+  }
+  function tickFmt(v) {
+    var r = Math.round(v * 100) / 100;
+    if (r === 0) return "0";
+    return (r > 0 ? "+" : "−") + String(Math.abs(r));
+  }
+
+  function shapePath(shape, r) {
+    var h, R;
+    if (shape === "square") { h = r * 0.9; return "M" + (-h) + "," + (-h) + "H" + h + "V" + h + "H" + (-h) + "Z"; }
+    if (shape === "tri") { R = r * 1.28; return "M0," + (-R) + "L" + (R * 0.866) + "," + (R * 0.5) + "L" + (-R * 0.866) + "," + (R * 0.5) + "Z"; }
+    if (shape === "tridown") { R = r * 1.28; return "M0," + R + "L" + (R * 0.866) + "," + (-R * 0.5) + "L" + (-R * 0.866) + "," + (-R * 0.5) + "Z"; }
+    if (shape === "hex") { R = r * 1.08; var s = ""; for (var i = 0; i < 6; i++) { var a = Math.PI / 3 * i; s += (i ? "L" : "M") + (R * Math.cos(a)).toFixed(2) + "," + (R * Math.sin(a)).toFixed(2); } return s + "Z"; }
+    if (shape === "diamond") { R = r * 1.3; return "M0," + (-R) + "L" + R + ",0L0," + R + "L" + (-R) + ",0Z"; }
+    return "M" + (-r) + ",0a" + r + "," + r + " 0 1,0 " + (2 * r) + ",0a" + r + "," + r + " 0 1,0 " + (-2 * r) + ",0Z";
+  }
+
+  function radiusFor(p, small) {
+    var r = 4.5 + Math.sqrt(p.cons) * 3;
+    return small ? r * 0.82 : r;
+  }
+
+  function niceStep(span, count) {
+    var raw = span / Math.max(1, count);
+    var mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+    var n = raw / mag;
+    var step = n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10;
+    return step * mag;
+  }
+
+  function domainFor(vals, count) {
+    var lo = Math.min.apply(null, vals.concat([0]));
+    var hi = Math.max.apply(null, vals.concat([0]));
+    var pad = (hi - lo) * 0.07;
+    lo -= pad; hi += pad;
+    var step = niceStep(hi - lo, count);
+    lo = Math.floor(lo / step) * step;
+    hi = Math.ceil(hi / step) * step;
+    var ticks = [];
+    for (var t = lo; t <= hi + step * 0.001; t += step) ticks.push(Math.round(t * 1000) / 1000);
+    return { lo: lo, hi: hi, ticks: ticks };
+  }
+
+  function build() {
+    var W = plot.clientWidth;
+    if (!W) return;
+    var small = W < 560;
+    var H = small ? Math.round(Math.max(380, W * 1.12)) : Math.round(Math.min(700, Math.max(460, W * 0.6)));
+    var m = small ? { t: 18, r: 12, b: 50, l: 46 } : { t: 22, r: 22, b: 56, l: 62 };
+    state.W = W; state.H = H; state.m = m; state.small = small;
+
+    if (state.svg) state.svg.parentNode.removeChild(state.svg);
+    var svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "chart no-anim");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("width", W);
+    svg.setAttribute("height", H);
+    svg.setAttribute("role", "group");
+    svg.setAttribute("aria-label", "Scatter plot of every experiment");
+
+    var html = "" +
+      "<defs>" +
+      "<radialGradient id=\"kz\" cx=\"0\" cy=\"1\" r=\"1.15\"><stop offset=\"0\" class=\"kz-stop-a\"></stop><stop offset=\"1\" class=\"kz-stop-b\"></stop></radialGradient>" +
+      "<filter id=\"soft\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\"><feGaussianBlur stdDeviation=\"2.4\"></feGaussianBlur></filter>" +
+      "</defs>" +
+      "<g class=\"zone-layer\"></g><g class=\"grid-layer\"></g><g class=\"pts-layer\"></g><g class=\"lab-layer\"></g>";
+    svg.innerHTML = html;
+
+    var ptsLayer = svg.querySelector(".pts-layer");
+    state.ptsEls = [];
+    // Draw big points first so small ones stay on top.
+    var order = P.slice().sort(function (a, b) { return b.cons - a.cons; });
+    order.forEach(function (p) {
+      var r = radiusFor(p, small);
+      var shape = FAM[p.fam].shape;
+      var g = document.createElementNS(NS, "g");
+      g.setAttribute("class", "pt fam-" + p.fam + " v-" + p.v);
+      g.setAttribute("tabindex", "0");
+      g.setAttribute("role", "img");
+      g.setAttribute("aria-label", p.name + ": weekly win rate " + fmt(p.apN, 1) + " vs realistic rivals, " + fmt(p.apX, 1) + " vs strict rivals. " + VERDICT[p.v] + ".");
+      g.setAttribute("data-i", String(p.i));
+      var inner = "<circle class=\"hit\" r=\"" + Math.max(14, r + 8) + "\"></circle>";
+      if (p.v === "pass") {
+        inner += "<path class=\"halo\" filter=\"url(#soft)\" d=\"" + shapePath(shape, r + 5) + "\"></path>";
+        inner += "<path class=\"ring pass\" d=\"" + shapePath(shape, r + 4.5) + "\"></path>";
+      } else if (p.v === "near") {
+        inner += "<path class=\"ring near\" d=\"" + shapePath(shape, r + 4.5) + "\"></path>";
+      }
+      inner += "<path class=\"shape\" d=\"" + shapePath(shape, r) + "\"></path>";
+      g.innerHTML = inner;
+      g.style.transform = "translate(" + (W / 2) + "px," + (H / 2) + "px)";
+      ptsLayer.appendChild(g);
+      state.ptsEls[p.i] = g;
+    });
+
+    plot.insertBefore(svg, tt);
+    state.svg = svg;
+    bindPoints();
+    draw(false);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { if (state.svg === svg) svg.classList.remove("no-anim"); });
+    });
+  }
+
+  function draw(animate) {
+    var svg = state.svg;
+    if (!svg) return;
+    var V = VIEWS[state.view];
+    var W = state.W, H = state.H, m = state.m, small = state.small;
+    var plotted = P.filter(function (p) { return p.k !== "hindsight"; });
+    var xd = domainFor(plotted.map(V.x), small ? 5 : 9);
+    var yd;
+    if (V.yFixed) {
+      yd = { lo: V.yFixed[0], hi: V.yFixed[1], ticks: V.yTicks };
+    } else {
+      yd = domainFor(plotted.map(V.y), small ? 6 : 8);
+    }
+    var x0 = m.l, x1 = W - m.r, y0 = m.t, y1 = H - m.b;
+    function sx(v) { return x0 + (v - xd.lo) / (xd.hi - xd.lo) * (x1 - x0); }
+    function sy(v) { return y1 - (v - yd.lo) / (yd.hi - yd.lo) * (y1 - y0); }
+
+    // Keep zone
+    var zx = sx(0), zy = sy(V.zoneY);
+    var zone = "<rect x=\"" + zx + "\" y=\"" + y0 + "\" width=\"" + Math.max(0, x1 - zx) + "\" height=\"" + Math.max(0, zy - y0) + "\" rx=\"6\" fill=\"url(#kz)\"></rect>" +
+      "<path class=\"kz-edge\" d=\"M" + zx + "," + y0 + "V" + zy + "H" + x1 + "\"></path>";
+    svg.querySelector(".zone-layer").innerHTML = zone;
+
+    // Grid, zero lines, ticks, axis titles
+    var g = "";
+    xd.ticks.forEach(function (t) {
+      var X = sx(t);
+      if (Math.abs(t) > 1e-9) g += "<line class=\"gl\" x1=\"" + X + "\" x2=\"" + X + "\" y1=\"" + y0 + "\" y2=\"" + y1 + "\"></line>";
+      g += "<text class=\"tick\" x=\"" + X + "\" y=\"" + (y1 + 18) + "\" text-anchor=\"middle\">" + tickFmt(t) + "</text>";
+    });
+    yd.ticks.forEach(function (t) {
+      var Y = sy(t);
+      var isZeroLine = V.yFixed ? false : Math.abs(t) < 1e-9;
+      if (!isZeroLine) g += "<line class=\"gl\" x1=\"" + x0 + "\" x2=\"" + x1 + "\" y1=\"" + Y + "\" y2=\"" + Y + "\"></line>";
+      var lab = V.yFixed ? String(t) : tickFmt(t);
+      g += "<text class=\"tick\" x=\"" + (x0 - 8) + "\" y=\"" + (Y + 4) + "\" text-anchor=\"end\">" + lab + "</text>";
+    });
+    g += "<line class=\"zl\" x1=\"" + zx + "\" x2=\"" + zx + "\" y1=\"" + y0 + "\" y2=\"" + y1 + "\"></line>";
+    if (!V.yFixed) g += "<line class=\"zl\" x1=\"" + x0 + "\" x2=\"" + x1 + "\" y1=\"" + zy + "\" y2=\"" + zy + "\"></line>";
+    g += "<text class=\"axt\" x=\"" + ((x0 + x1) / 2) + "\" y=\"" + (H - 10) + "\" text-anchor=\"middle\">" + esc(V.xt) + "</text>";
+    g += "<text class=\"axt\" transform=\"translate(" + (small ? 12 : 16) + "," + ((y0 + y1) / 2) + ") rotate(-90)\" text-anchor=\"middle\">" + esc(V.yt) + "</text>";
+
+    // Quadrant labels (also obstacles for point labels)
+    var qBoxes = [];
+    var qs = small ? 9.5 : 10.5;
+    function ql(text, x, y, anchor, cls) {
+      if (!text) return;
+      var w = monoW(text.toUpperCase(), qs);
+      var left = anchor === "end" ? x - w : x;
+      if (left < x0 + 2 || left + w > x1 - 2) return;
+      qBoxes.push([left - 3, y - qs - 2, left + w + 3, y + 4]);
+      g += "<text class=\"ql" + (cls ? " " + cls : "") + "\" x=\"" + x + "\" y=\"" + y + "\" text-anchor=\"" + anchor + "\"" + (small ? " style=\"font-size:" + qs + "px\"" : "") + ">" + esc(text) + "</text>";
+    }
+    ql(V.q.tr, zx + 10, y0 + 18, "start", "keep");
+    ql(V.q.tl, x0 + 8, y0 + 18, "start");
+    ql(V.q.bl, x0 + 8, y1 - 10, "start");
+    ql(V.q.br, x1 - 8, y1 - 10, "end");
+    svg.querySelector(".grid-layer").innerHTML = g;
+
+    // Points
+    var pos = [];
+    P.forEach(function (p) {
+      var vx = V.x(p), vy = V.y(p);
+      var X = sx(vx), Y = sy(vy);
+      var off = "";
+      if (vx > xd.hi) { X = x1 - 10; off += "x"; }
+      if (vy > yd.hi) { Y = y0 + 10; off += "y"; }
+      pos[p.i] = { p: p, x: X, y: Y, r: radiusFor(p, small), off: off };
+    });
+    if (V.yFixed) dodge(pos);
+    pos.forEach(function (o) {
+      state.ptsEls[o.p.i].style.transform = "translate(" + o.x.toFixed(1) + "px," + o.y.toFixed(1) + "px)";
+    });
+    state.pos = pos;
+
+    var lab = svg.querySelector(".lab-layer");
+    clearTimeout(state.labTimer);
+    if (animate && !reduceMotion) {
+      lab.classList.add("hide");
+      state.labTimer = setTimeout(function () {
+        placeLabels(pos, qBoxes, x0, x1, y0, y1);
+        lab.classList.remove("hide");
+      }, 720);
+    } else {
+      placeLabels(pos, qBoxes, x0, x1, y0, y1);
+      lab.classList.remove("hide");
+    }
+    hideTip();
+  }
+
+  // In the consistency view many points share a row; nudge overlapping ones apart vertically.
+  function dodge(pos) {
+    var rows = {};
+    pos.forEach(function (o) { var key = String(o.p.cons); (rows[key] = rows[key] || []).push(o); });
+    Object.keys(rows).forEach(function (key) {
+      var row = rows[key].sort(function (a, b) { return a.x - b.x; });
+      var flip = 1;
+      for (var i = 1; i < row.length; i++) {
+        var prev = row[i - 1], cur = row[i];
+        if (Math.abs(cur.x - prev.x) < prev.r + cur.r + 2 && Math.abs(cur.y - prev.y) < prev.r + cur.r) {
+          cur.y = prev.y + flip * (prev.r + cur.r) * 0.75;
+          flip = -flip;
+        }
+      }
+    });
+  }
+
+  function overlaps(a, b) { return a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]; }
+
+  function placeLabels(pos, qBoxes, x0, x1, y0, y1) {
+    var svg = state.svg;
+    var size = state.small ? 11 : 12;
+    var obstacles = qBoxes.slice();
+    pos.forEach(function (o) { obstacles.push([o.x - o.r - 3, o.y - o.r - 3, o.x + o.r + 3, o.y + o.r + 3, o.p.i]); });
+    var rank = { pass: 0, near: 1, ref: 2, fail: 3 };
+    var order = pos.slice().sort(function (a, b) {
+      if (rank[a.p.v] !== rank[b.p.v]) return rank[a.p.v] - rank[b.p.v];
+      var da = Math.pow(a.x - (x0 + x1) / 2, 2) + Math.pow(a.y - (y0 + y1) / 2, 2);
+      var db = Math.pow(b.x - (x0 + x1) / 2, 2) + Math.pow(b.y - (y0 + y1) / 2, 2);
+      return db - da;
+    });
+    var out = "";
+    order.forEach(function (o) {
+      var p = o.p;
+      var strong = p.v === "pass" || p.v === "near";
+      var weight = strong ? 700 : 500;
+      var text = p.short;
+      if (o.off) {
+        var arrow = o.off === "xy" ? "↗" : o.off === "x" ? "→" : "↑";
+        text = p.short + " " + fmt(VIEWS[state.view].x(p), 1) + " / " + (VIEWS[state.view].yFixed ? p.cons + " of 10" : fmt(VIEWS[state.view].y(p), 1)) + " " + arrow;
+      }
+      var w = textW(text, size, weight) + 2;
+      var h = size + 2;
+      var gap = o.r + (strong ? 9 : 5);
+      var cands = [
+        [o.x + gap, o.y + size * 0.35, "start"],
+        [o.x - gap, o.y + size * 0.35, "end"],
+        [o.x, o.y - gap - 2, "middle"],
+        [o.x, o.y + gap + size, "middle"],
+        [o.x + gap * 0.75, o.y - gap * 0.75, "start"],
+        [o.x + gap * 0.75, o.y + gap * 0.75 + size * 0.7, "start"],
+        [o.x - gap * 0.75, o.y - gap * 0.75, "end"],
+        [o.x - gap * 0.75, o.y + gap * 0.75 + size * 0.7, "end"]
+      ];
+      for (var c = 0; c < cands.length; c++) {
+        var tx = cands[c][0], ty = cands[c][1], anchor = cands[c][2];
+        var left = anchor === "start" ? tx : anchor === "end" ? tx - w : tx - w / 2;
+        var box = [left, ty - size, left + w, ty + 3];
+        if (box[0] < x0 + 2 || box[2] > x1 + (state.small ? 8 : 16) || box[1] < y0 - 12 || box[3] > y1 - 1) continue;
+        var hit = false;
+        for (var k = 0; k < obstacles.length; k++) {
+          var ob = obstacles[k];
+          if (ob.length === 5 && ob[4] === p.i) continue;
+          if (overlaps(box, ob)) { hit = true; break; }
+        }
+        if (hit) continue;
+        obstacles.push(box);
+        var cls = "lab" + (strong ? " strong" : "") + (p.v === "ref" ? " refl" : "");
+        out += "<text class=\"" + cls + "\" x=\"" + tx.toFixed(1) + "\" y=\"" + ty.toFixed(1) + "\" text-anchor=\"" + anchor + "\"" + (state.small ? " style=\"font-size:" + size + "px\"" : "") + ">" + esc(text) + "</text>";
+        break;
+      }
+    });
+    svg.querySelector(".lab-layer").innerHTML = out;
+  }
+
+  // Tooltip
+  function swatch(p) {
+    var shape = FAM[p.fam].shape;
+    var cls = p.fam === "ref" ? "" : "sw fam-" + p.fam;
+    var attrs = p.fam === "ref" ? " style=\"fill:none;stroke:var(--ref);stroke-width:1.6\"" : "";
+    return "<svg width=\"12\" height=\"12\" viewBox=\"-7 -7 14 14\" aria-hidden=\"true\"><path class=\"" + cls + "\"" + attrs + " d=\"" + shapePath(shape, 4.6) + "\"></path></svg>";
+  }
+
+  function tipHTML(p) {
+    return "<div class=\"fam\">" + swatch(p) + esc(FAM[p.fam].label) + "</div>" +
+      "<div class=\"nm\">" + esc(p.name) + "</div>" +
+      "<div class=\"what\">" + esc(p.what) + "</div>" +
+      "<table><thead><tr><th></th><th>Realistic rivals</th><th>Strict rivals</th></tr></thead><tbody>" +
+      "<tr><th>Weekly win rate</th><td>" + fmt(p.apN, 2) + "</td><td>" + fmt(p.apX, 2) + "</td></tr>" +
+      "<tr><th>Title odds</th><td>" + fmt(p.tiN, 2) + "</td><td>" + fmt(p.tiX, 2) + "</td></tr>" +
+      "<tr><th>Seasons helped</th><td>" + p.sN + " of 5</td><td>" + p.sX + " of 5</td></tr>" +
+      "</tbody></table>" +
+      "<div class=\"vd\"><span class=\"pill " + p.v + "\">" + VERDICT[p.v] + "</span></div>" +
+      "<div class=\"take\" style=\"margin-top:6px\">" + esc(p.take) + "</div>";
+  }
+
+  function showTip(i) {
+    var o = state.pos && state.pos[i];
+    if (!o) return;
+    tt.innerHTML = tipHTML(o.p);
+    var W = plot.clientWidth;
+    var tw = tt.offsetWidth, th = tt.offsetHeight;
+    var left = o.x + o.r + 14;
+    if (left + tw > W) left = o.x - o.r - 14 - tw;
+    if (left < 0) left = Math.max(0, Math.min(W - tw, o.x - tw / 2));
+    var top = o.y - th / 2;
+    if (left === Math.max(0, Math.min(W - tw, o.x - tw / 2))) {
+      top = o.y + o.r + 12;
+      if (top + th > state.H) top = o.y - o.r - 12 - th;
+    }
+    top = Math.max(0, Math.min(state.H - th, top));
+    tt.style.left = left + "px";
+    tt.style.top = top + "px";
+    tt.classList.add("show");
+    state.svg.classList.add("focus");
+    state.ptsEls.forEach(function (el, j) { el.classList.toggle("on", j === i); });
+  }
+
+  function hideTip() {
+    tt.classList.remove("show");
+    state.pinned = -1;
+    if (state.svg) state.svg.classList.remove("focus");
+    state.ptsEls.forEach(function (el) { el.classList.remove("on"); });
+  }
+
+  function bindPoints() {
+    state.ptsEls.forEach(function (el, i) {
+      el.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse" && state.pinned < 0) showTip(i); });
+      el.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse" && state.pinned < 0) hideTip(); });
+      el.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (state.pinned === i) { hideTip(); return; }
+        showTip(i);
+        state.pinned = i;
+      });
+      el.addEventListener("focus", function () { showTip(i); });
+      el.addEventListener("blur", function () { if (state.pinned !== i) hideTip(); });
+      el.addEventListener("keydown", function (e) { if (e.key === "Escape") { hideTip(); el.blur(); } });
+    });
+  }
+  document.addEventListener("click", function (e) {
+    if (state.pinned >= 0 && !(e.target.closest && e.target.closest(".pt"))) hideTip();
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") hideTip(); });
+
+  // View toggle
+  var buttons = Array.prototype.slice.call(document.querySelectorAll(".seg button"));
+  buttons.forEach(function (b) {
+    b.addEventListener("click", function () {
+      var v = b.getAttribute("data-view");
+      if (v === state.view) return;
+      state.view = v;
+      buttons.forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+      note.textContent = VIEWS[v].note;
+      draw(true);
+    });
+  });
+
+  // Numbers table
+  (function table() {
+    var rows = P.slice().sort(function (a, b) {
+      var ra = { pass: 0, near: 1, fail: 2, ref: 3 };
+      if (ra[a.v] !== ra[b.v]) return ra[a.v] - ra[b.v];
+      return (b.apN + b.apX) - (a.apN + a.apX);
+    });
+    var h = "<table><thead><tr><th>Experiment</th><th>Family</th><th>Verdict</th><th>Win rate, realistic</th><th>Win rate, strict</th><th>Title odds, realistic</th><th>Title odds, strict</th><th>Seasons helped, realistic</th><th>Seasons helped, strict</th></tr></thead><tbody>";
+    rows.forEach(function (p) {
+      h += "<tr><td>" + esc(p.name) + "</td><td>" + esc(FAM[p.fam].label) + "</td><td>" + VERDICT[p.v] + "</td><td>" + fmt(p.apN, 2) + "</td><td>" + fmt(p.apX, 2) + "</td><td>" + fmt(p.tiN, 2) + "</td><td>" + fmt(p.tiX, 2) + "</td><td>" + p.sN + "/5</td><td>" + p.sX + "/5</td></tr>";
+    });
+    document.getElementById("table").innerHTML = h + "</tbody></table>";
+  })();
+
+  build();
+
+  var lastW = plot.clientWidth;
+  var raf = 0;
+  function onResize() {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(function () {
+      var w = plot.clientWidth;
+      if (w && Math.abs(w - lastW) > 1) { lastW = w; build(); }
+    });
+  }
+  if (window.ResizeObserver) { new ResizeObserver(onResize).observe(plot); }
+  else { window.addEventListener("resize", onResize); }
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { if (state.svg) draw(false); });
+  }
+})();
+</script>
