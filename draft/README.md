@@ -430,6 +430,22 @@ own "add must beat the drop" test often enough to cost the seat 1.7 moves a seas
 Scaling the bar alone is worth about +0.1 points of all-play and passes only with noisy
 opponents.
 
+**No combination of sources beats consensus on the draft board, and only the injury report
+adds anything weekly.** `source_value_season.py` fits every one of the 255 subsets of eight
+source groups (consensus, our projection, the stack, market ADP, platform ADP, role,
+profile, prior production) per position on prior seasons only, and scores the 2021-25
+seasons by within-position rank correlation, with exact Shapley values and a 200-draw
+permutation test. Consensus carries the most information by a wide margin; the best subset
+adds +0.003 of rank correlation and helps in 2 of 5 seasons, so the draft board stays on
+raw consensus rank. `source_value_weekly.py` does the same for weekly start/sit over a
+16,848 player-week panel. Only availability (Questionable, Doubtful, practice status) adds
+to weekly consensus: +1.4 points of pairwise accuracy, 5 of 5 seasons. But the harness's
+own consensus seat already discounts Questionable players, and against that seat the gain
+falls to +0.4, below the bar. Kalshi prices add nothing on top (p = .47). Two leads worth
+chasing: gameday inactives are worth +1.3 points and are not in the harness's lineup rule,
+and consensus is slightly sharper on Thursday games, which may mean a Friday scrape sees
+Thursday results.
+
 So the tools now build on consensus. `lineup.py` sets start/sit from weekly consensus
 ranks, and `trade.py` values players by consensus rest-of-season ranks (`--values model`
 for the old behaviour). Our model supplies what consensus doesn't: availability,
