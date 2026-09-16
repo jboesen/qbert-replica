@@ -341,6 +341,25 @@ consensus value have nearly the same spread, so there's almost no variance to tr
 variance lever that plausibly exists is correlation (stacking a quarterback with his
 receiver), which this model doesn't see.
 
+**Nor does making that choice head-to-head and situational.** The obvious objection to
+`winprob.py` is that it optimised against the field when a week is played against one
+opponent, and ignored the season: a must-win underdog should buy variance, a locked-in
+favourite should buy a floor. `sim_variance.py` tests exactly that on top of the best
+realistic policy (`mutual_cap2`), choosing each week's lineup to maximise the chance of
+outscoring that week's actual head-to-head opponent, at a price in projected points that
+scales with how much the week swings the seat's playoff odds, computed from games played
+so far (`prereg_variance.md`). Because the lineup now depends on the schedule, the seat is
+scored once per schedule draw on the control's roster path, which makes the pairing exact.
+Every arm fails in both designs: all-play and title move by under 0.03 points, the lineup
+differs from consensus in under 1% of decisions, and a budget of twelve projected points
+picks exactly the same lineups as a budget of three. The reason was measurable before the
+run. Residual spread rises monotonically with consensus value, so the highest-scoring
+lineup is already close to the widest one, and paying points buys a floor (up to -1.6 of
+standard deviation) rather than a swing (at most +0.3). Where the policy does act it is
+mostly a favourite benching a questionable starter. The situational argument may well be
+right; a model that draws every player independently cannot express it, and correlation
+remains the untested lever.
+
 **Consensus isn't slow or biased in the ways people assume.** `ecr_bias.py` checks the
 2020–25 rankings directly. They don't chase hot or cold weeks. Blending preseason ranks
 or season-to-date scoring into the rest-of-season rank doesn't improve it out of sample.
