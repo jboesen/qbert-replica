@@ -41,24 +41,22 @@ import pandas as pd
 from scipy.stats import norm
 
 sys.path.insert(0, "draft")
+import availability as A
+import correlate as CO
+import roster as R
+import settings as CFG
 from vbd import LEAGUE
 from assistant import match
 import consensus as C
 
-POS = ["QB", "RB", "WR", "TE"]
+SET = CFG.get()
+POS = list(CFG.POSITIONS)
 FLEX = list(LEAGUE["flex"])
 SLOTS = LEAGUE["starters"]
 # Weekly PPR sd as a function of the player's mean, per position (player-seasons with 8+
 # games, 2018-25). Scoring is right-skewed for RB/WR/TE, so this is a rough spread only.
 SD = {"QB": (5.22, .14), "RB": (2.43, .38), "WR": (2.27, .41), "TE": (1.57, .49)}
-RECOVER = 0.45         # weekly chance a hurt player returns; mean absence about two games
-IR_WEEKS = 4           # players on reserve/PUP sit out at least this long
-# Skill players carried per team, for where the waiver wire sits.
-ROSTERED = {"QB": 1.5, "RB": 4.5, "WR": 5.0, "TE": 1.5}
-REG_END, LAST_WEEK = 14, 17     # fantasy regular season, then playoffs 15-17
-# Chance a player misses the week, by game designation (2016-25 play rates). Only used
-# when the weekly projection, which carries its own p_play, hasn't been built.
-STATUS_OUT = {"Out": 1.0, "Doubtful": 0.99, "Questionable": 0.43}
+REG_END, LAST_WEEK = SET.reg_weeks, SET.weeks
 
 
 def sd_of(pos, mean):
@@ -84,8 +82,8 @@ def load_values(season, source="consensus"):
         b = pd.read_parquet(f"data/board_{season}.parquet")
         v = b[["player_display_name", "position"]].copy()
         v["ppg"] = b.proj_ppg
-        v["avail"] = b.proj_games / 17
-    v["avail"] = v.avail.clip(0.3, 0.98)
+        v["avail"] = b.proj_games / SET.weeks
+    v["avail"] = A.clip_rate(v.avail)
 
     # Points per game from consensus rest-of-season ranks where consensus has one:
     # consensus out-forecasts our model for season totals and single weeks alike (see
@@ -119,12 +117,8 @@ def schedule(season, start=None):
 
 
 def injury_report(season):
-    try:
-        inj = pd.read_parquet(f"data/injuries_{season}.parquet")
-    except FileNotFoundError:
-        return pd.Series(dtype=float)
-    inj = inj[inj.week == inj.week.max()].drop_duplicates("gsis_id", keep="last")
-    return inj.set_index("gsis_id").report_status.map(STATUS_OUT).dropna()
+    """This week's chance of missing, by designation, from the shared definition."""
+    return A.report_status(season)
 
 
 def weekly_override(season, week):
@@ -144,10 +138,13 @@ class Season:
     """Rest-of-season simulator. One instance fixes the random draws, so every roster
     evaluated through it sees the same injuries for the same player."""
 
-    def __init__(self, values, season, sims=2000, seed=0, start=None, live=True):
+    def __init__(self, values, season, sims=2000, seed=0, start=None, live=True,
+                 rostered=None):
         """`live` reads this week's injury report and matchup projections; a backtest
-        of a past season turns it off and starts wherever it likes."""
+        of a past season turns it off and starts wherever it likes. `rostered` is every
+        player held in the league, which is what prices replacement off the real pool."""
         self.v, self.sims, self.seed = values, sims, seed
+        self.rostered = set(rostered) if rostered is not None else None
         self.week, self.weeks, self.plays = schedule(season, start)
         self.W = len(self.weeks)
         self.reg = np.array([w <= REG_END for w in self.weeks])
@@ -161,11 +158,22 @@ class Season:
         self.opp_mu, self.opp_var = self._average_team()
 
     def _waiver_line(self):
-        """Best player nobody rosters, per position: a weekly stream, always available."""
+        """Best player nobody rosters, per position: a weekly stream, always available.
+
+        With real rosters in hand the honest answer is the best genuinely unrostered
+        player, which is what settings.replacement == "pool" uses. The published default
+        instead counts down an assumed number of players rostered per team, which is
+        kept because changing it would move results that are already published.
+        """
         out = {}
         for p in POS:
-            ranked = (self.v[self.v.position == p].ppg * self.v.avail).sort_values(ascending=False)
-            k = int(round(LEAGUE["teams"] * ROSTERED[p]))
+            exp = self.v[self.v.position == p].ppg * self.v.avail
+            if SET.replacement == "pool" and self.rostered is not None:
+                free = exp[~exp.index.isin(self.rostered)].sort_values(ascending=False)
+                out[p] = float(free.iloc[0]) if len(free) else 0.0
+                continue
+            ranked = exp.sort_values(ascending=False)
+            k = int(round(SET.teams * SET.rostered_mult[p]))
             out[p] = float(ranked.iloc[min(k, len(ranked) - 1)])
         return out
 
@@ -175,16 +183,16 @@ class Season:
         mu = var = 0.0
         used = {}
         for p, k in SLOTS.items():
-            n = LEAGUE["teams"] * k
+            n = SET.teams * k
             top = exp[self.v.position == p].nlargest(n)
             used[p] = n
             mu += k * top.mean()
             var += k * sd_of(p, top.mean()) ** 2
         flex_pool = pd.concat([exp[self.v.position == p].sort_values(ascending=False)
                                .iloc[used[p]:] for p in FLEX])
-        top = flex_pool.nlargest(LEAGUE["teams"] * LEAGUE["flex_slots"])
-        mu += LEAGUE["flex_slots"] * top.mean()
-        var += LEAGUE["flex_slots"] * sd_of("WR", top.mean()) ** 2
+        top = flex_pool.nlargest(SET.teams * SET.flex_slots)
+        mu += SET.flex_slots * top.mean()
+        var += SET.flex_slots * sd_of("WR", top.mean()) ** 2
         return mu, var
 
     def player(self, pid):
@@ -193,17 +201,8 @@ class Season:
             return self.cache[pid]
         r = self.v.loc[pid]
         rng = np.random.default_rng([self.seed, zlib.crc32(pid.encode())])
-        u = rng.random((self.sims, self.W))
-        a = r.avail
-        hazard = min(RECOVER * (1 - a) / a, 0.9)      # stationary availability = a
-        hurt = rng.random(self.sims) < self.hurt0.get(pid, 0.0)
-        ir = r.status in ("RES", "PUP", "NFI")
-        out = np.empty((self.sims, self.W), bool)
-        for i in range(self.W):
-            if ir and i < IR_WEEKS:
-                hurt = np.ones(self.sims, bool)
-            out[:, i] = hurt
-            hurt = np.where(hurt, u[:, i] >= RECOVER, u[:, i] < hazard)
+        out = A.injury_path(rng, self.sims, self.W, r.avail,
+                            self.hurt0.get(pid, 0.0), r.status in ("RES", "PUP", "NFI"))
         bye = np.array([r.team not in self.plays[w] for w in self.weeks])
         mean = np.full(self.W, r.ppg)
         if self.W and pid in self.matchup.index:
@@ -226,12 +225,36 @@ class Season:
             mu += m[..., :k].sum(-1)
             var += (sd_of(p, m[..., :k]) ** 2).sum(-1)
             nxt[p] = m[..., k]
-        cand = np.stack([nxt[p] for p in FLEX], axis=-1)
-        pick = cand.argmax(-1)
-        flex = np.take_along_axis(cand, pick[..., None], -1)[..., 0]
-        mu += flex
-        var += np.choose(pick, [sd_of(p, flex) ** 2 for p in FLEX])
+        for _ in range(SET.flex_slots):
+            cand = np.stack([nxt[p] for p in FLEX], axis=-1)
+            pick = cand.argmax(-1)
+            flex = np.take_along_axis(cand, pick[..., None], -1)[..., 0]
+            mu += flex
+            var += np.choose(pick, [sd_of(p, flex) ** 2 for p in FLEX])
+            # A second flex slot takes the next man at whichever position just supplied one.
+            for j, p in enumerate(FLEX):
+                nxt[p] = np.where(pick == j, -np.inf, nxt[p])
+        if SET.correlations:
+            var = var + self._stack_var(roster)
         return mu, var
+
+    def _stack_var(self, roster):
+        """Extra lineup variance from starting a quarterback with his own receiver.
+
+        Priced on the expected starters rather than per simulated week, which is an
+        approximation: the pair is counted whenever both would normally start, not only
+        in the scenarios where they actually do. The correlation itself is an assumption
+        and is off by default. See correlate.py.
+        """
+        if not len(roster):
+            return 0.0
+        v = self.v.loc[list(roster)]
+        exp = v.ppg * v.avail
+        pairs = []
+        for qb, mates in CO.stacks(v.position, v.team, list(roster)):
+            best = exp[mates].idxmax()
+            pairs.append((("QB", float(exp[qb])), (v.at[best, "position"], float(exp[best]))))
+        return CO.stack_variance(pairs, lambda p, m: sd_of(p, m))
 
     def outlook(self, roster):
         key = frozenset(roster)
@@ -253,14 +276,19 @@ class Season:
 
 def drop_for_space(sim, roster, n, exact=True):
     """Cut the n players whose loss costs the least (a full roster is assumed). The
-    exact version simulates each cut; the quick one drops the lowest surplus."""
+    exact version simulates each cut; the quick one drops the lowest surplus.
+
+    The cut is taken from the players roster.py says are cuttable, so a forced cut can
+    never leave the team unable to field a legal starting lineup.
+    """
     for _ in range(n):
+        can = R.cuttable(sim.v.position, roster) or list(roster)
         if exact:
             base = sim.outlook(roster)["wins"].mean()
             cost = {x: base - sim.outlook([y for y in roster if y != x])["wins"].mean()
-                    for x in roster}
+                    for x in can}
         else:
-            cost = {x: sim.surplus(x) for x in roster}
+            cost = {x: sim.surplus(x) for x in can}
         roster = [y for y in roster if y != min(cost, key=cost.get)]
     return roster
 
@@ -316,8 +344,11 @@ def relevant(sim, roster, n=10):
 
 def suggest(v, season, me, teams, partner=None, top=10):
     """Trades where both sides gain wins: screen cheaply, then re-run the best carefully."""
-    screen = Season(v, season, sims=300, seed=1)
-    exact = Season(v, season, sims=3000, seed=2)
+    held = {p for r in teams.values() for p in r}
+    screen = Season(v, season, sims=300, seed=1, rostered=held)
+    exact = Season(v, season, sims=3000, seed=2, rostered=held)
+    if not trade_window_open(screen.week):
+        return
     mine = teams[me]
     rows = []
     for t, theirs in teams.items():
@@ -347,6 +378,18 @@ def suggest(v, season, me, teams, partner=None, top=10):
               f"them {r['them']['wins'][0]:+.2f} wins ({r['them']['pts'][0]:+.0f} pts)")
 
 
+def trade_window_open(week, s=SET):
+    """Whether a trade may still be made. Past the deadline, or once the playoffs have
+    started, the answer is no however good the trade looks."""
+    if week > s.trade_deadline_week:
+        print(f"\nthe trade deadline was week {s.trade_deadline_week}; it is week {week}.")
+        return False
+    if week > s.reg_weeks and not s.trade_in_playoffs:
+        print(f"\nthe playoffs have started; no trades after week {s.reg_weeks}.")
+        return False
+    return True
+
+
 def resolve(v, text_or_list):
     names_ = text_or_list if isinstance(text_or_list, list) else text_or_list.split(",")
     ids, missing = match(v, ",".join(names_))
@@ -369,6 +412,7 @@ def main():
     ap.add_argument("--sims", type=int, default=4000)
     ap.add_argument("--values", choices=["consensus", "model"], default="consensus",
                     help="points per game from consensus ROS ranks (default) or the model")
+    ap.add_argument("--settings", help="JSON of league settings; see draft/settings.py")
     a = ap.parse_args()
 
     v = load_values(a.season, a.values)
@@ -383,7 +427,9 @@ def main():
     if a.suggest:
         return suggest(v, a.season, me, teams, a.partner)
 
-    sim = Season(v, a.season, sims=a.sims)
+    sim = Season(v, a.season, sims=a.sims,
+                 rostered={p for r in teams.values() for p in r})
+    trade_window_open(sim.week)      # reported, not enforced: an offer can still be priced
     give, get = resolve(v, a.give), resolve(v, a.get)
     theirs = teams[a.partner]
     for x in give:

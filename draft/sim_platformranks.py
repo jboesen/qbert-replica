@@ -25,10 +25,12 @@ import pandas as pd
 
 sys.path.insert(0, "draft")
 import league_backtest as LB
+import settings as CFG
 import consensus as C
 from draft_dp import snake_picks
 
-NOISE = 1.0
+SET = CFG.get()
+NOISE = SET.noise
 LEAGUES = LB.LEAGUES
 # Weight on the platform order in the opponents' list; 0 is the plain consensus room of
 # run_streaming (used only for the mechanics check that the control reproduces it).

@@ -33,14 +33,18 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, "draft")
+import correlate as CO
 import league_backtest as LB
+import settings as CFG
 import weekly as W
+
+SET = CFG.get()
 
 POS, SLOTS, FLEX = LB.POS, LB.SLOTS, LB.FLEX
 TEAMS, REG, WEEKS = LB.TEAMS, LB.REG, LB.WEEKS
 SEASONS = LB.SEASONS
 LEAGUES, SCHEDULES = LB.LEAGUES, LB.SCHEDULES
-NOISE = 1.0
+NOISE = SET.noise
 FIRST_FIT = 2020            # the first season with weekly consensus ranks for a full year
 BUCKETS = 5                 # value quintiles per position
 MIN_BUCKET = 30             # a thinner bucket borrows its neighbour's residuals
@@ -53,7 +57,7 @@ MARGIN_SE = 2.0
 # The most starters one position can take: its slots plus the flex. A player beaten on
 # value by this many others in his own spread bucket is never worth starting, because
 # swapping him for an unused one shifts the whole score distribution up.
-MAX_START = {p: SLOTS[p] + (p in FLEX) for p in POS}
+MAX_START = {p: SLOTS[p] + (SET.flex_slots if p in FLEX else 0) for p in POS}
 
 
 # ---------------------------------------------------------------- the spread model
@@ -127,14 +131,21 @@ def spread_summary(model):
     return pd.DataFrame(out)
 
 
-def draw(model, pos, value, quest, p_q, rng):
+def draw(model, pos, value, quest, p_q, rng, shock=None):
     """DRAWS scenario scores for one player. A questionable player's harness value is
     his value times the chance he plays, so he is drawn as that mixture: he plays with
-    probability p_q and then scores like a player of the undiscounted value."""
+    probability p_q and then scores like a player of the undiscounted value.
+
+    With `shock`, his team's shared scenario draw is blended into his own residual, so
+    a quarterback and his receiver move together. Off by default; see correlate.py.
+    """
     v = value / p_q if quest else value
     edges, pools = model[pos]
     r = pools[int(np.digitize(v, edges))]
-    s = v + r[rng.integers(0, len(r), DRAWS)]
+    resid = r[rng.integers(0, len(r), DRAWS)]
+    if shock is not None:
+        resid = CO.blend(resid, shock, float(np.std(r)))
+    s = v + resid
     if quest:
         s = s * (rng.random(DRAWS) < p_q)
     return s
@@ -185,7 +196,7 @@ def candidates(S, model, roster, w, quest):
     return out
 
 
-def winprob_week(S, model, rosters, seat, w, quest, rng):
+def winprob_week(S, model, rosters, seat, w, quest, rng, teams=None):
     """The lineup with the most expected opponents outscored in week w.
 
     Returns (lineup, expected count for the consensus lineup, for the chosen lineup).
@@ -195,10 +206,13 @@ def winprob_week(S, model, rosters, seat, w, quest, rng):
     comparison between two lineups carries far less noise than either estimate.
     """
     cache = {}
+    # One shared shock per NFL team, drawn once so every player on it sees the same one.
+    shocks = CO.team_shock(rng, teams, DRAWS) if teams is not None else None
 
     def scen(i):
         if i not in cache:
-            cache[i] = draw(model, S.pos[i], S.ecr_val[i, w], quest[i, w], S.p_q, rng)
+            sh = None if shocks is None else shocks.get(teams[i])
+            cache[i] = draw(model, S.pos[i], S.ecr_val[i, w], quest[i, w], S.p_q, rng, sh)
         return cache[i]
 
     opp = []
@@ -258,6 +272,9 @@ def run(check=False):
         S.p_q = W.play_probs(y).get("Questionable", 0.57)      # the harness's discount
         quest = questionable(S, y)
         model = fit_spread(y, curves)
+        # Only built when the correlation is switched on; without it every draw is
+        # independent, exactly as every published winprob number was computed.
+        wk_teams = CO.weekly_teams(S.ids, y, WEEKS) if SET.correlations else None
         for lg in range(LEAGUES):
             # The same draws in the same order as the main harness, so the drafts and
             # the control's scores match its exact-consensus arm.
@@ -281,7 +298,8 @@ def run(check=False):
                     # the same in both opponent designs.
                     mc = np.random.default_rng([y, lg, seat, w, 7])
                     t0 = time.perf_counter()
-                    lu, e_cons, e_best = winprob_week(S, model, rosters, seat, w, quest, mc)
+                    lu, e_cons, e_best = winprob_week(S, model, rosters, seat, w, quest,
+                                                      mc, wk_teams[w] if wk_teams else None)
                     cons = consensus_lineup(S, rosters[seat], w)
                     if lu != cons:
                         test[seat, w] = S.actual[list(lu), w].sum()

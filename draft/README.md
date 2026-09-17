@@ -626,6 +626,82 @@ all season. The win estimate is against an average opponent, not your schedule o
 playoff odds. And "the other side should want it" means by this model's valuation. A
 manager reading consensus rankings may see it differently.
 
+## Pointing it at a different league
+
+Every league rule and modelling assumption lives in `draft/settings.py`, in one
+dataclass that every tool and the harness read. Nothing is written down twice, so
+changing a rule changes it everywhere at once. The defaults are the league every
+published number on this page was computed on: 12 teams, PPR, 1QB/2RB/2WR/1TE/1FLEX,
+14 rounds, 14 regular-season weeks and a six-team playoff with two byes.
+
+Override from a JSON file, either a bare settings object or a `"settings"` key added to
+the `league.json` you already have. A `league.json` without that key keeps working and
+leaves every assumption at its default.
+
+```bash
+.venv/bin/python draft/waivers.py --league league.json --settings league_12team_3flex.json
+FF_SETTINGS=league_12team_3flex.json .venv/bin/python draft/trade.py --league league.json --suggest
+```
+
+`league_12team_3flex.json` in the repo root is a worked example: three flex slots, 16
+roster spots, a 13-week regular season, a four-team playoff with no byes, a week-10
+trade deadline, and replacement priced off the real waiver pool. In code, build a
+variant from the defaults:
+
+```python
+from settings import Settings, activate
+activate(Settings().replace(teams=10, flex_slots=3))
+```
+
+Whenever a tool runs with anything overridden it prints a line naming every changed
+assumption before it does any work, so a result computed under changed assumptions is
+never mistaken for a default-settings one.
+
+### What can be varied
+
+| group | knobs |
+| --- | --- |
+| league | `teams`, `starters`, `flex`, `flex_slots`, `scoring` |
+| roster | `rounds`, `roster_size`, `caps`, `roster_min`, `one_each`, `second_after`, `cut_rule`, `enforce_caps_in_season` |
+| calendar | `reg_weeks`, `weeks`, `playoff_teams`, `playoff_byes`, `playoff_reseed`, `seasons` |
+| wire | `waiver_mode`, `waiver_moves_per_week`, `first_waiver_week`, `faab_budget` |
+| trades | `trade_first_week`, `trade_deadline_week`, `trade_cap`, `trade_gain_min`, `trade_near_best`, `trade_in_playoffs` |
+| injuries | `recover`, `ir_weeks`, `avail_floor`, `avail_ceiling`, `p_questionable`, `status_out`, `out_statuses`, `active_statuses` |
+| modelling | `replacement`, `rostered_mult`, `correlations`, `qb_receiver_rho`, `opp_defence_effect`, `noise`, `leagues`, `schedules` |
+
+Two of those are declared but refused: `scoring` other than `"ppr"` and `waiver_mode`
+`"faab"` both raise on construction, because nothing reads them yet. FAAB bidding lives
+in `sim_faab.py` and has not been wired into the shared settings. Refusing them beats
+accepting a setting that quietly does nothing.
+
+Four switches change behaviour rather than describe the league, so each defaults to what
+the published runs did:
+
+- `enforce_caps_in_season` (default off). The draft has always capped rosters at two
+  quarterbacks and seven running backs; the in-season wire never checked. Turning this
+  on applies one set of caps to the draft, the wire and trades alike, which is the
+  consistent rule but moves published numbers.
+- `replacement` (default `"multiplier"`). The published definition counts down an
+  assumed number of players rostered per team. `"pool"` prices replacement off the best
+  genuinely unrostered player given the league's real rosters, which is the right answer
+  for a live tool and the wrong one for reproducing a published result.
+- `trade_in_playoffs` (default off) and `trade_deadline_week`. The harness never traded
+  past week 11, so the default deadline reproduces it.
+- `correlations` (default off). A quarterback and his own receiver score together, and a
+  defence suppresses both. This is an assumption, not a fix: the correlation is a
+  plausible figure rather than one fit to this data, and `opp_defence_effect` defaults
+  to 0 so nothing moves until it is set. See `draft/correlate.py`.
+
+### Which assumptions are measured and which are not
+
+Measured: `p_questionable` and `status_out` (2016-25 play rates), the weekly spread
+model in `trade.py`, and the defence ratings in `correlate.py`. Assumed, and flagged as
+such in the code: `recover` and `ir_weeks` (tuned to a mean absence of about two games,
+not fit to the injury data), `avail_floor` and `avail_ceiling`, `rostered_mult` (which
+matches neither the draft caps nor the wire's minimums), `qb_receiver_rho`, and the
+draft's `caps` and `second_after`, which keep simulated opponents sane rather than
+reproduce a rule real leagues have.
+
 ## Known limits
 
 - **It doesn't beat consensus yet.** In the league backtest neither the draft board

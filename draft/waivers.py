@@ -39,14 +39,16 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, "draft")
+import availability as A
 import consensus as C
-import weekly as W
+import roster as R
+import settings as CFG
 from lineup import resolve
 from vbd import LEAGUE, add_vbd
 
-POS = ["QB", "RB", "WR", "TE"]
+SET = CFG.get()
+POS = list(CFG.POSITIONS)
 SLOTS, FLEX = LEAGUE["starters"], list(LEAGUE["flex"])
-ACTIVE, OUT = {"ACT", "INA"}, {"Out", "Doubtful"}
 ROSTERS = ("https://github.com/nflverse/nflverse-data/releases/download/weekly_rosters/"
            "roster_weekly_{y}.parquet")
 
@@ -55,7 +57,7 @@ def needs(c):
     """Starting slots still empty, flex included, given position counts c."""
     short = {p: max(0, k - c.get(p, 0)) for p, k in SLOTS.items()}
     extra = sum(max(0, c.get(p, 0) - SLOTS[p]) for p in FLEX)
-    short["FLEX"] = max(0, LEAGUE["flex_slots"] - extra)
+    short["FLEX"] = max(0, SET.flex_slots - extra)
     return short
 
 
@@ -103,34 +105,9 @@ def values(y, w, pos):
 
 
 def unavailable(y, w, ids):
-    """Known out for week w at waiver time: bye, off the active roster, or Out/Doubtful
-    on the latest report. Players with no roster row count as unavailable."""
-    g = pd.read_csv("data/games.csv")
-    g = g[(g.season == y) & (g.game_type == "REG") & (g.week == w)]
-    playing = set(g.away_team) | set(g.home_team)
-    ro = fresh_rosters(y)
-    ro = ro[(ro.game_type == "REG") & (ro.week < w)].sort_values("week")
-    last = ro.drop_duplicates("gsis_id", keep="last").set_index("gsis_id")
-    try:
-        inj = pd.read_parquet(f"data/injuries_{y}.parquet")
-        inj = inj[inj.week < w]
-        inj = inj[inj.week == inj.week.max()] if len(inj) else inj
-        hurt = set(inj[inj.report_status.isin(OUT)].gsis_id)
-    except FileNotFoundError:
-        hurt = set()
-    why = {}
-    for p in ids:
-        if p not in last.index:
-            why[p] = "no roster row"
-            continue
-        r = last.loc[p]
-        if r.status not in ACTIVE:
-            why[p] = f"roster status {r.status}"
-        elif W.norm_team(pd.Series([r.team])).iloc[0] not in playing:
-            why[p] = "bye"
-        elif p in hurt:
-            why[p] = "out/doubtful last report"
-    return why
+    """Known out for week w at waiver time, by the shared definition in availability.py:
+    bye, off the active roster, or Out/Doubtful on the latest report."""
+    return A.live_reasons(y, w, ids, fresh_rosters(y))
 
 
 def holes(roster, pos, gone):
@@ -142,8 +119,8 @@ def holes(roster, pos, gone):
 
 
 def cuttable(roster, pos):
-    counts = pd.Series([pos[p] for p in roster]).value_counts()
-    return [p for p in roster if counts.get(pos[p], 0) > SLOTS.get(pos[p], 0)]
+    """The same rule the harness and the trade tool apply, from roster.py."""
+    return R.cuttable(pos, roster)
 
 
 def starters(roster, pos, val, gone):
@@ -151,9 +128,9 @@ def starters(roster, pos, val, gone):
     used = set()
     for p, k in SLOTS.items():
         used |= set(sorted((i for i in avail if pos[i] == p), key=lambda i: -val.get(i, -1e9))[:k])
-    flex = [i for i in avail if pos[i] in FLEX and i not in used]
-    if flex:
-        used.add(max(flex, key=lambda i: val.get(i, -1e9)))
+    flex = sorted((i for i in avail if pos[i] in FLEX and i not in used),
+                  key=lambda i: -val.get(i, -1e9))
+    used.update(flex[:SET.flex_slots])
     return used
 
 
@@ -195,6 +172,7 @@ def main():
     ap.add_argument("--league", required=True)
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument("--week", type=int)
+    ap.add_argument("--settings", help="JSON of league settings; see draft/settings.py")
     a = ap.parse_args()
     y = a.season
     w = a.week or upcoming_week(y)

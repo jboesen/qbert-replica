@@ -8,9 +8,11 @@ prices every player against the replacement he displaces at his own position.
 import numpy as np
 import pandas as pd
 
-# 12-team league, PPR, one flex.
-LEAGUE = dict(teams=12, starters={"QB": 1, "RB": 2, "WR": 2, "TE": 1},
-              flex=("RB", "WR", "TE"), flex_slots=1, rounds=14)
+import settings as CFG
+
+# The league's shape, from the one settings object every tool reads. Defaults are the
+# 12-team PPR league with one flex that every published result was run on.
+LEAGUE = CFG.get().league_dict()
 
 
 def replacement_levels(proj, league=LEAGUE):

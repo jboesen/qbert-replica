@@ -25,12 +25,15 @@ import pandas as pd
 sys.path.insert(0, "draft")
 import consensus as C
 import league_backtest as LB
+import roster as R
 import weekly as W
+import settings as CFG
 from league_backtest import FLEX, POS, REG, SLOTS, TEAMS, WEEKS
 
-TRADE_WEEKS = range(3, 12)          # decisions before weeks 3..11
+SET = CFG.get()
+TRADE_WEEKS = SET.trade_weeks       # decisions before weeks 3..11 by default
 K_SWEEP = (0.0, 0.1, 0.2)
-NEAR_BEST = 0.9                     # test B: "equal value" means within 10% of the best gain
+NEAR_BEST = SET.trade_near_best     # test B: "equal value" means within this of the best gain
 EPS = 1e-6
 POS_CODE = {p: i for i, p in enumerate(POS)}
 
@@ -155,13 +158,18 @@ def lineup_value(pts, avail, rosters):
     code = np.where(empty, -1, POS_CODE_ARR[idx])
     total = np.zeros(x.shape[0])
     flex = np.zeros((x.shape[0], x.shape[2]))
+    F = SET.flex_slots
+    spare = []
     for p, c in POS_CODE.items():
         xp = np.where((code == c)[:, :, None], x, 0.0)
         k = SLOTS[p]
-        top = -np.sort(-xp, axis=1)[:, :k + 1, :]
+        top = -np.sort(-xp, axis=1)[:, :k + F, :]
         total += top[:, :k, :].sum(axis=(1, 2))
         if p in FLEX and top.shape[1] > k:
-            flex = np.maximum(flex, top[:, k, :])
+            spare.append(top[:, k:, :])
+    if spare:                              # the flex slots take the best leftovers
+        pool = -np.sort(-np.concatenate(spare, axis=1), axis=1)
+        flex = pool[:, :F, :].sum(axis=1)
     return total + flex.sum(axis=1)
 
 
@@ -175,7 +183,8 @@ def counts_of(S, players):
 
 
 def legal(c):
-    return all(c[p] >= LB.ROSTER_MIN.get(p, 0) for p in POS)
+    """The same legality test the wire and the draft use, from roster.py."""
+    return R.legal(c)
 
 
 def search(S, rosters, seat, v, val, pts, avail, k, sos=None):
@@ -443,6 +452,7 @@ if __name__ == "__main__":
         LB.NOISE = float(sys.argv[sys.argv.index("--noise") + 1])
     if "--leagues" in sys.argv:      # mechanics checks only; a real run uses the default
         LB.LEAGUES = int(sys.argv[sys.argv.index("--leagues") + 1])
+    CFG.announce_run(noise=LB.NOISE, leagues=LB.LEAGUES)
     check = "" if LB.LEAGUES == 20 else f"_check{LB.LEAGUES}"
     d, tl = run()
     d.to_parquet(f"data/league_trades{check}_noise{LB.NOISE:g}.parquet")

@@ -31,13 +31,15 @@ import pandas as pd
 sys.path.insert(0, "draft")
 import consensus as C
 import league_backtest as LB
+import settings as CFG
 import weekly as W
 
 POS, FLEX = LB.POS, LB.FLEX
 TEAMS, REG, WEEKS = LB.TEAMS, LB.REG, LB.WEEKS
 SEASONS = LB.SEASONS
 LEAGUES, SCHEDULES = LB.LEAGUES, LB.SCHEDULES
-NOISE = 1.0
+SET = CFG.get()
+NOISE = SET.noise
 HORIZONS = (2, 3)            # weeks looked at, the upcoming one included
 ARMS = ("stream",) + tuple(f"look{h}" for h in HORIZONS)
 

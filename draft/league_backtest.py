@@ -40,6 +40,9 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, "draft")
+import availability as A
+import roster as R
+import settings as CFG
 from vbd import LEAGUE, add_vbd
 from draft_dp import BENCH_VALUE, snake_picks
 import board as B
@@ -48,24 +51,27 @@ import stack as K
 import usage as U
 import weekly as W
 
-POS = ["QB", "RB", "WR", "TE"]
+# Every league rule and modelling assumption comes from settings.py, which defaults to
+# exactly the league these results were published on. Nothing below is a second copy.
+SET = CFG.get()
+POS = list(CFG.POSITIONS)
 SLOTS = LEAGUE["starters"]
 FLEX = list(LEAGUE["flex"])
 TEAMS, ROUNDS = LEAGUE["teams"], LEAGUE["rounds"]
-SEASONS = range(2021, 2026)
-REG, WEEKS = 14, 17
-LEAGUES, SCHEDULES = 20, 20
+SEASONS = range(SET.seasons[0], SET.seasons[-1] + 1)
+REG, WEEKS = SET.reg_weeks, SET.weeks
+LEAGUES, SCHEDULES = SET.leagues, SET.schedules
 # Roster rules for every seat alike, the way draft simulators keep bots sane: at most
 # two QBs and two TEs (no second of either before round 9), at most seven RBs or WRs,
 # and once the picks left only just cover the empty starting slots, draft for them.
-CAP, SECOND_AFTER = {"QB": 2, "TE": 2, "RB": 7, "WR": 7}, 9
-ONE_EACH = ("QB", "TE")                      # positions where a second is held back
-ACTIVE = {"ACT", "INA"}                      # on the 53; INA is the gameday inactive list
-OUT = {"Out", "Doubtful"}
+CAP, SECOND_AFTER = SET.caps, SET.second_after
+ONE_EACH = SET.one_each                      # positions where a second is held back
+ACTIVE = set(SET.active_statuses)            # on the 53; INA is the gameday inactive list
+OUT = set(SET.out_statuses)
 TITLE_GUARD = -0.010
 # Opponents' deviation from consensus, in units of the experts' own spread. 1 is the
 # main design; 0 is the sensitivity check where every opponent follows consensus exactly.
-NOISE = 1.0
+NOISE = SET.noise
 # prereg_adp.md: the draft-market arms, scored with consensus lineups only, and the most
 # consensus-implied season value adp_gap will give up to take a player the market won't
 # leave it. Declared before the run, not tuned.
@@ -253,7 +259,7 @@ def needs(c):
     """Starting slots still empty, flex included, given position counts c."""
     short = {p: max(0, k - c[p]) for p, k in SLOTS.items()}
     extra = sum(max(0, c[p] - SLOTS[p]) for p in FLEX)
-    short["FLEX"] = max(0, LEAGUE["flex_slots"] - extra)
+    short["FLEX"] = max(0, SET.flex_slots - extra)
     return short
 
 
@@ -406,7 +412,8 @@ def week_points(S, roster, value, w):
         total += S.actual[r[pick], w].sum()
     cand = np.where(np.isin(pos, FLEX) & ~used & np.isfinite(v))[0]
     if len(cand):
-        total += S.actual[r[cand[np.argmax(v[cand])]], w]
+        pick = cand[np.argsort(-v[cand], kind="stable")][:SET.flex_slots]
+        total += S.actual[r[pick], w].sum()
     return total
 
 
@@ -432,8 +439,40 @@ def schedules(rng, n):
     return out
 
 
+def bracket(seed, scores, s=SET):
+    """The champion of a single-elimination playoff, given the seeding.
+
+    Configurable where it used to be a hand-written six-team bracket. Byes are given to
+    the top seeds in the first round; every later round pairs the best remaining seed
+    with the worst, which is what the published bracket did when it put the lower of the
+    two quarter-final winners against the #1 seed.
+
+    A tie on the week's score goes to the better seed. The one exception is the final,
+    where it goes to the winner of the half of the bracket containing the top seed,
+    because with two teams left there is no matchup to assign and the order is only a
+    tiebreak. That is the published rule and it is kept so results do not move.
+    """
+    alive = list(range(s.playoff_teams))              # positions in `seed`, best first
+    week = s.reg_weeks                                # 0-indexed first playoff week
+    while len(alive) > 1:
+        if week >= s.weeks:
+            raise ValueError("the playoff bracket does not fit in the weeks available")
+        byes = s.playoff_byes if week == s.reg_weeks else 0
+        if s.playoff_reseed and len(alive) > 2:
+            alive = sorted(alive)
+        rest = alive[byes:]
+        nxt = alive[:byes]
+        for i in range(len(rest) // 2):
+            a, b = rest[i], rest[-1 - i]
+            nxt.append(a if scores[seed[a], week] >= scores[seed[b], week] else b)
+        if len(rest) % 2:                             # an odd man out advances
+            nxt.append(rest[len(rest) // 2])
+        alive, week = nxt, week + 1
+    return seed[alive[0]]
+
+
 def season_outcome(scores, sched):
-    """Wins, playoff berth and title per team for one schedule. scores: teams x 17."""
+    """Wins, playoff berth and title per team for one schedule. scores: teams x weeks."""
     wins = np.zeros(TEAMS)
     for w, rd in enumerate(sched):
         for a, b in rd:
@@ -441,14 +480,9 @@ def season_outcome(scores, sched):
     pf = scores[:, :REG].sum(1)
     seed = sorted(range(TEAMS), key=lambda t: (-wins[t], -pf[t]))
     playoff = np.zeros(TEAMS, bool)
-    playoff[seed[:6]] = True
-    beat = lambda a, b, w: a if scores[a, w] >= scores[b, w] else b
-    q1, q2 = beat(seed[2], seed[5], 14), beat(seed[3], seed[4], 14)
-    lo, hi = sorted([q1, q2], key=seed.index, reverse=True)       # lower seed plays #1
-    s1, s2 = beat(seed[0], lo, 15), beat(seed[1], hi, 15)
-    champ = beat(s1, s2, 16)
+    playoff[seed[:SET.playoff_teams]] = True
     title = np.zeros(TEAMS, bool)
-    title[champ] = True
+    title[bracket(seed, scores)] = True
     return wins, playoff, title
 
 
@@ -462,8 +496,8 @@ def all_play(scores, t):
 # Waiver rules, applied identically to every seat (prereg_waivers.md): one add/drop a
 # week, roster size fixed at 14, no FAAB, no trades, no IR slot. A team may never cut
 # below a legal starting lineup, so the wire cannot leave it unable to field one.
-ROSTER_MIN = SLOTS
-FIRST_WAIVER = 2                  # the first decision is made once week 1 has been played
+ROSTER_MIN = SET.roster_min
+FIRST_WAIVER = SET.first_waiver_week   # the first decision follows week 1
 
 
 def waiver_values(S, y, crv, fits):
@@ -565,13 +599,15 @@ def priority(scores, upto):
 
 def cuttable(S, held):
     """Rostered players a team may cut without dropping a position below its starters."""
-    counts = {p: int((S.pos[held] == p).sum()) for p in POS}
-    return np.array([i for i in held if counts[S.pos[i]] > ROSTER_MIN.get(S.pos[i], 0)])
+    return np.array(R.cuttable(S.pos, held), dtype=int)
 
 
 def consensus_move(S, held, val, free, w):
     """The consensus wire policy: add the best free agent, drop the worst cuttable player,
     only when the add is worth more. Returns (add, drop) or None."""
+    free = R.add_allowed(S.pos, held, free)     # a no-op unless the cap is enforced
+    if not len(free):
+        return None
     add = free[int(np.argmax(val[free]))]
     can_cut = cuttable(S, held)
     if not len(can_cut):
@@ -590,18 +626,21 @@ def waiver_week(S, rosters, values, order, w, movers=None):
     for r in rosters:
         on_roster[r] = True
     moves = np.zeros(TEAMS, int)
-    for t in order:
-        val = values[t][:, w - 1]
-        free = np.where(~on_roster & np.isfinite(val))[0]
-        if not len(free):
-            continue
-        move = (movers or {}).get(t, consensus_move)(S, np.array(rosters[t]), val, free, w)
-        if move is None:
-            continue
-        add, drop = move
-        rosters[t] = [i for i in rosters[t] if i != drop] + [int(add)]
-        on_roster[add], on_roster[drop] = True, False
-        moves[t] += 1
+    # A league allowing more than one move a week runs the whole priority pass again,
+    # so the worst team still picks first on its second move. The default is one.
+    for _ in range(SET.waiver_moves_per_week):
+        for t in order:
+            val = values[t][:, w - 1]
+            free = np.where(~on_roster & np.isfinite(val))[0]
+            if not len(free):
+                continue
+            move = (movers or {}).get(t, consensus_move)(S, np.array(rosters[t]), val, free, w)
+            if move is None:
+                continue
+            add, drop = move
+            rosters[t] = [i for i in rosters[t] if i != drop] + [int(add)]
+            on_roster[add], on_roster[drop] = True, False
+            moves[t] += 1
     return moves
 
 
@@ -722,32 +761,10 @@ def report_waivers(d):
 def known_unavailable(S, y):
     """Who is known to be unavailable for week w at the waiver decision before it.
 
-    The harness's own eligibility reads week w's roster status and injury report, which
-    publish after waivers clear, so a waiver policy can't use it. What it can see is the
-    schedule and last week's files: a bye, a player off the 53, or one ruled Out or
-    Doubtful last week, assumed still out. Teams on bye have no roster rows, so a player
-    whose team was off in week w-1 is read from his last week before that. Row w-1 of the
-    result is the decision before week w.
+    One definition of availability, in availability.py, shared with the live tools. Row
+    w-1 of the result is the decision made before week w.
     """
-    n = len(S.ids)
-    ix = {p: i for i, p in enumerate(S.ids)}
-    g = pd.read_csv("data/games.csv")
-    g = g[(g.season == y) & (g.game_type == "REG")]
-    plays = {(w, t) for w, a, h in zip(g.week, g.away_team, g.home_team) for t in (a, h)}
-    inj = pd.read_parquet(f"data/injuries_{y}.parquet")
-    out = {(p, w) for p, w, s in zip(inj.gsis_id, inj.week, inj.report_status) if s in OUT}
-    ro = pd.read_parquet(f"data/roster_weekly_{y}.parquet")
-    ro = ro[(ro.game_type == "REG") & (ro.week <= WEEKS) & ro.gsis_id.isin(ix)]
-    ro = ro.assign(team=W.norm_team(ro.team)).sort_values("week")
-    last = {}                                 # player -> (week, status, team), latest seen
-    rows = {w: list(zip(x.gsis_id, x.status, x.team)) for w, x in ro.groupby("week")}
-    gone = np.ones((n, WEEKS), bool)          # no roster row yet counts as unavailable
-    for w in range(FIRST_WAIVER, WEEKS + 1):
-        for p, s, t in rows.get(w - 1, []):
-            last[p] = (w - 1, s, t)
-        for p, (wk, s, t) in last.items():
-            gone[ix[p], w - 1] = s not in ACTIVE or (p, wk) in out or (w, t) not in plays
-    return gone
+    return A.harness_grid(S.ids, y, WEEKS)
 
 
 def holes(S, players, gone_w):
@@ -767,9 +784,9 @@ def starters(S, players, val, gone_w):
     used = set()
     for p, k in SLOTS.items():
         used |= set(sorted((i for i in players if S.pos[i] == p), key=lambda i: -v[i])[:k])
-    flex = [i for i in players if S.pos[i] in FLEX and i not in used]
-    if flex:
-        used.add(max(flex, key=lambda i: v[i]))
+    flex = sorted((i for i in players if S.pos[i] in FLEX and i not in used),
+                  key=lambda i: -v[i])
+    used.update(flex[:SET.flex_slots])
     return used
 
 
@@ -790,6 +807,7 @@ def streaming_policy(S, gone, log):
             return cons
         fills = [p for p in POS if before[p] > 0 or (p in FLEX and before["FLEX"] > 0)]
         cand = free[np.isin(S.pos[free], fills) & ~g[free]]
+        cand = R.add_allowed(S.pos, held, cand)     # a no-op unless the cap is enforced
         if not len(cand):
             return cons
         add = int(cand[int(np.argmax(val[cand]))])
@@ -1062,6 +1080,7 @@ if __name__ == "__main__":
         NOISE = float(sys.argv[sys.argv.index("--noise") + 1])
     if "--leagues" in sys.argv:      # mechanics checks only; a real run uses the default
         LEAGUES = int(sys.argv[sys.argv.index("--leagues") + 1])
+    CFG.announce_run(noise=NOISE, leagues=LEAGUES)
     # Never overwrite a real result with a short check.
     check = "" if LEAGUES == 20 else f"_check{LEAGUES}"
     if "--streaming" in sys.argv:

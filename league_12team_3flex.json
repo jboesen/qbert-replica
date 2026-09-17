@@ -1,0 +1,22 @@
+{
+  "me": "John",
+  "teams": {
+    "John": ["Ja'Marr Chase", "Bijan Robinson"],
+    "Alex": ["CeeDee Lamb", "Saquon Barkley"]
+  },
+  "settings": {
+    "teams": 12,
+    "starters": {"QB": 1, "RB": 2, "WR": 2, "TE": 1},
+    "flex": ["RB", "WR", "TE"],
+    "flex_slots": 3,
+    "rounds": 16,
+    "roster_size": 16,
+    "caps": {"QB": 3, "TE": 3, "RB": 8, "WR": 8},
+    "reg_weeks": 13,
+    "weeks": 17,
+    "playoff_teams": 4,
+    "playoff_byes": 0,
+    "trade_deadline_week": 10,
+    "replacement": "pool"
+  }
+}

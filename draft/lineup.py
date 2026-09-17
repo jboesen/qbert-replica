@@ -5,7 +5,7 @@ weekly model in every season, under both opponent designs (draft/README.md, "Doe
 win leagues?"). So this sets the lineup from consensus. Each player's weekly positional
 rank becomes expected points on a curve fit to 2020-25, which puts every position on one
 scale for the flex. Out and doubtful players sit. Questionable players are discounted by
-how often questionable players have played (57%). Players on bye sit.
+how often questionable players have played, from settings.p_questionable. Players on bye sit.
 
 Refresh first: `update.py` for injury reports, then `draft/consensus.py` for the
 week's ranks.
@@ -21,11 +21,13 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, "draft")
+import availability as A
 import consensus as C
+import settings as CFG
 from vbd import LEAGUE
 
+SET = CFG.get()
 SLOTS, FLEX = LEAGUE["starters"], list(LEAGUE["flex"])
-OUT, P_QUESTIONABLE = {"Out", "Doubtful"}, 0.57
 
 
 def resolve(names):
@@ -50,6 +52,7 @@ def main():
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument("--mine", default="")
     ap.add_argument("--league")
+    ap.add_argument("--settings", help="JSON of league settings; see draft/settings.py")
     a = ap.parse_args()
     names = (json.load(open(a.league))["teams"][json.load(open(a.league))["me"]]
              if a.league else a.mine.split(","))
@@ -80,10 +83,11 @@ def main():
         note = ""
         if team not in playing:
             pts, note = -1.0, "bye"
-        elif st in OUT:
+        elif A.sits(st):
             pts, note = -1.0, st.lower()
         elif st == "Questionable":
-            pts, note = pts * P_QUESTIONABLE, "questionable"
+            # One definition of what a designation costs, shared with every other tool.
+            pts, note = pts * A.play_discount(st), "questionable"
         rows.append((pid, players.display_name.get(pid), pos, int(rank), pts, note))
     d = pd.DataFrame(rows, columns=["id", "name", "pos", "rank", "pts", "note"])
 
@@ -91,7 +95,7 @@ def main():
     for p, k in SLOTS.items():
         for x in d[(d.pos == p) & (d.pts >= 0)].nlargest(k, "pts").itertuples():
             start.append((p, x)); used.add(x.id)
-    fl = d[d.pos.isin(FLEX) & ~d.id.isin(used) & (d.pts >= 0)].nlargest(LEAGUE["flex_slots"], "pts")
+    fl = d[d.pos.isin(FLEX) & ~d.id.isin(used) & (d.pts >= 0)].nlargest(SET.flex_slots, "pts")
     for x in fl.itertuples():
         start.append(("FLEX", x)); used.add(x.id)
 

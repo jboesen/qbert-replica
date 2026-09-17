@@ -37,7 +37,9 @@ EPS = ST.EPS
 GAIN_MIN = TC.GAIN_MIN          # 10 rest-of-season lineup points, tradecap's frozen bar
 BASE_WEEK = 3                   # the week the flat bar was calibrated on
 WEEKS_AT_BASE = WEEKS + 1 - BASE_WEEK     # 15 weeks left at the first trade decision
-CAP = 2                         # tradecap's mutual_cap2: at most two trades a season
+# tradecap's verdict arm: at most two trades a season, read from its arm table rather
+# than written down a second time.
+CAP = {a[0]: a[2] for a in TC.ARMS}[TC.VERDICT]
 ODDS_CUT = 0.25                 # below this a seat is a seller
 BUY_MULT, SELL_MULT = 0.5, 2.0  # what the odds regime does to the trade bar
 NEAR_ADD = 1.0                  # ppg of rest-of-season value a tilted waiver add may give up

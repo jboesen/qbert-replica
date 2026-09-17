@@ -36,14 +36,16 @@ import pandas as pd
 sys.path.insert(0, "draft")
 import consensus as C
 import league_backtest as LB
+import settings as CFG
 
 POS = LB.POS
 TEAMS, REG, WEEKS = LB.TEAMS, LB.REG, LB.WEEKS
 SEASONS = LB.SEASONS
 LEAGUES, SCHEDULES = LB.LEAGUES, LB.SCHEDULES
-NOISE = 1.0
+SET = CFG.get()
+NOISE = SET.noise
 FIRST = LB.FIRST_WAIVER
-BUDGET = 100
+BUDGET = SET.faab_budget
 BID_SEASONS = (2023, 2024, 2025)
 P_STAR = 0.75
 # Pacing: never bid more than PACE / (decisions left, this one included) of what is left,

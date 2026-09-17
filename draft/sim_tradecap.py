@@ -25,10 +25,12 @@ sys.path.insert(0, "draft")
 import consensus as C
 import league_backtest as LB
 import sim_trades as ST
+import settings as CFG
 from league_backtest import POS, REG, TEAMS, WEEKS
 
+SET = CFG.get()
 EPS = ST.EPS
-GAIN_MIN = 10.0        # rest-of-season lineup points a capped trade must project
+GAIN_MIN = SET.trade_gain_min   # rest-of-season lineup points a capped trade must project
 CHECK_SEARCH = False   # mechanics check: the mutual search, unfiltered, must equal ST.search
 
 # (arm, acceptance, cap, minimum gain). stream and tradeA_k0 are sim_trades' arms exactly.
@@ -360,6 +362,7 @@ if __name__ == "__main__":
         LB.NOISE = float(sys.argv[sys.argv.index("--noise") + 1])
     if "--leagues" in sys.argv:      # mechanics checks only; a real run uses the default
         LB.LEAGUES = int(sys.argv[sys.argv.index("--leagues") + 1])
+    CFG.announce_run(noise=LB.NOISE, leagues=LB.LEAGUES)
     check = "" if LB.LEAGUES == 20 else f"_check{LB.LEAGUES}"
     CHECK_SEARCH = bool(check) and "--mechanics" in sys.argv
     d, tl, dec = run()
