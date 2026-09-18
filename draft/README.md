@@ -360,6 +360,26 @@ mostly a favourite benching a questionable starter. The situational argument may
 right; a model that draws every player independently cannot express it, and correlation
 remains the untested lever.
 
+**And stacking, the correlation lever itself, doesn't win either.** `sim_stack.py` tests
+the one thing an independent-player model can't see: a quarterback and his own receiver
+rise and fall together, so starting both widens your week at no cost in projected points
+(`prereg_stack.md`). The correlation was measured first, on 2015-20 box scores only, before
+any arm was written: a quarterback's weekly residual correlates **+0.285** with his own
+pass catcher's over 14,614 player-weeks, stable in every season, and by role WR1 +0.39,
+WR2 +0.33, TE1 +0.29, WR3+ +0.22. `correlate.py`'s assumed default of 0.35 is too high as a
+blanket figure; 0.25 is right against consensus residuals. (Two offences in the same game
+correlate +0.217, measured but not acted on.) That buys about half a point of lineup
+standard deviation, so a stack is worth roughly one projected point, and the arms spend
+one, spend three when an underdog, or take a stack partner off the wire at equal value, all
+on top of `mutual_cap2`. Every arm fails in both designs: the two lineup arms move all-play
+-0.1 to -0.3 points and are positive in at most 1 of 5 seasons. The interesting part is
+that the mechanism works and still doesn't pay. Weeks that started a stack really were
+wider (23.3 against 21.2-21.8 points of realised spread), but in the weeks the policy paid
+for one it won its head-to-head week 2 to 6 points *less* often than the consensus lineup
+would have, and the underdog-only arm, which is the theory's best case, was the worst arm in
+the run. Width is cheap and nearly worthless against a weekly total whose spread is already
+21-23 points.
+
 **Consensus isn't slow or biased in the ways people assume.** `ecr_bias.py` checks the
 2020–25 rankings directly. They don't chase hot or cold weeks. Blending preseason ranks
 or season-to-date scoring into the rest-of-season rank doesn't improve it out of sample.
