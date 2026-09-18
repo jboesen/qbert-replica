@@ -413,6 +413,8 @@ def main():
     ap.add_argument("--values", choices=["consensus", "model"], default="consensus",
                     help="points per game from consensus ROS ranks (default) or the model")
     ap.add_argument("--settings", help="JSON of league settings; see draft/settings.py")
+    ap.add_argument("--backtest-assumptions", action="store_true",
+                    help="price replacement and caps as the published backtest does")
     a = ap.parse_args()
 
     v = load_values(a.season, a.values)

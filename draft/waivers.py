@@ -173,6 +173,8 @@ def main():
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument("--week", type=int)
     ap.add_argument("--settings", help="JSON of league settings; see draft/settings.py")
+    ap.add_argument("--backtest-assumptions", action="store_true",
+                    help="price replacement and caps as the published backtest does")
     a = ap.parse_args()
     y = a.season
     w = a.week or upcoming_week(y)

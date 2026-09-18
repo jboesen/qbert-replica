@@ -232,7 +232,9 @@ class Settings:
             raw = raw["settings"]
         elif "teams" in raw and isinstance(raw["teams"], dict):
             raw = {}                          # a rosters-only league.json, no overrides
-        return cls.from_dict(raw)
+        s = cls.from_dict(raw)
+        object.__setattr__(s, "_named", frozenset(raw))
+        return s
 
     def changes(self):
         """Every field that differs from the defaults, as (name, default, mine)."""
@@ -292,6 +294,22 @@ def announce_run(**knobs):
         print("run overrides: " + ", ".join(diff), file=sys.stderr, flush=True)
 
 
+# Two assumptions are right for a real league and wrong for the published backtest, so
+# they cannot simply be defaults. Replacement should be the best player actually sitting
+# in your league's free pool, not a count assumed from roster multipliers, and a roster
+# that may not exceed its caps on draft day may not exceed them in November either. The
+# harness keeps the published values because changing them would move printed results;
+# the tools you point at a real league take these instead, and say so when they do.
+LIVE_TOOLS = ("waivers.py", "trade.py", "lineup.py")
+LIVE = dict(replacement="pool", enforce_caps_in_season=True)
+
+
+def live_profile(s):
+    """`s` with the live-league assumptions, except any the settings file named itself."""
+    named = getattr(s, "_named", frozenset())
+    return s.replace(**{k: v for k, v in LIVE.items() if k not in named})
+
+
 def _startup():
     """Apply `--settings PATH` or FF_SETTINGS at import, before any module reads a value.
 
@@ -305,8 +323,15 @@ def _startup():
         if i >= len(sys.argv):
             raise SystemExit("--settings needs a path to a JSON file")
         path = sys.argv[i]
-    if path:
-        activate(Settings.from_file(path))
+    s = Settings.from_file(path) if path else DEFAULTS
+    # A live tool is one pointed at a real league, so it takes the live assumptions
+    # unless the caller asked for the backtest's with --backtest-assumptions.
+    live = (os.path.basename(sys.argv[0]) in LIVE_TOOLS
+            and "--backtest-assumptions" not in sys.argv)
+    if live:
+        s = live_profile(s)
+    if s is not DEFAULTS:
+        activate(s)
 
 
 _startup()

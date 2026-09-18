@@ -634,6 +634,15 @@ changing a rule changes it everywhere at once. The defaults are the league every
 published number on this page was computed on: 12 teams, PPR, 1QB/2RB/2WR/1TE/1FLEX,
 14 rounds, 14 regular-season weeks and a six-team playoff with two byes.
 
+Two assumptions differ between a real league and the backtest, so the tools you point at
+your own league (`waivers.py`, `trade.py`, `lineup.py`) take the live ones by default and
+print which they took. Replacement is the best player actually sitting in your league's
+free pool, rather than a level implied by an assumed count of rostered players; and a
+roster that may not exceed its position caps on draft day may not exceed them in November
+either. The harness keeps the published values, because changing them would move printed
+results. Anything your settings file names itself wins over both, and
+`--backtest-assumptions` asks a live tool for the harness's values instead.
+
 Override from a JSON file, either a bare settings object or a `"settings"` key added to
 the `league.json` you already have. A `league.json` without that key keeps working and
 leaves every assumption at its default.

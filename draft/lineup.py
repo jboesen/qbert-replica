@@ -53,6 +53,8 @@ def main():
     ap.add_argument("--mine", default="")
     ap.add_argument("--league")
     ap.add_argument("--settings", help="JSON of league settings; see draft/settings.py")
+    ap.add_argument("--backtest-assumptions", action="store_true",
+                    help="price replacement and caps as the published backtest does")
     a = ap.parse_args()
     names = (json.load(open(a.league))["teams"][json.load(open(a.league))["me"]]
              if a.league else a.mine.split(","))
