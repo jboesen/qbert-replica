@@ -701,6 +701,22 @@ the published runs did:
   plausible figure rather than one fit to this data, and `opp_defence_effect` defaults
   to 0 so nothing moves until it is set. See `draft/correlate.py`.
 
+Two of those switches have now been run through the harness (`draft/sim_settings.py`,
+`draft/prereg_settings.md`), with the best realistic policy in the test seat and the
+setting changed for all twelve teams. The in-season cap is not cosmetic and it is not
+free: a third of all rosters in the published control carry more tight ends than the cap
+of 2, a quarter carry more quarterbacks, and turning the cap on costs the policy seat 1.7
+and 2.8 points of all-play in the two opponent designs, because carrying a spare
+quarterback or tight end through a bye is exactly the move hole-aware streaming makes. So
+`enforce_caps_in_season` stays off, and the published numbers should be read as coming
+from a league where a team may end the season with five quarterbacks. ESPN-style limits
+(4 QB / 8 RB / 8 WR / 3 TE) barely bind and cost nothing measurable, so a league that
+really has them can set them. `replacement="pool"` passes the rule in both designs
+(+1.8 and +2.3 points of all-play), but with the gain arriving almost entirely through
+which trades the model opponents accept rather than through the waiver wire, where the
+switch measures as a null; it is recommended as the better definition with that gain
+discounted, not because the number is large.
+
 ### Which assumptions are measured and which are not
 
 Measured: `p_questionable` and `status_out` (2016-25 play rates), the weekly spread
