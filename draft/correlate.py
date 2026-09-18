@@ -8,10 +8,16 @@ its slot-by-slot variance says, which matters for any win probability computed o
 spread. And a week against the best defence in the league is not the same week as one
 against the worst.
 
-This is an assumption, not a fix. The correlation below is a plausible figure rather
-than one fit to this data, and the defence effect is measured but its size as a
-multiplier on a projection is a modelling choice. Switching it on will move results, so
-it defaults off in settings and every caller is gated on that flag.
+The quarterback correlation is now measured rather than assumed: +0.25 against the weekly
+consensus expectation, from 2015-20 box scores, and stable across those seasons
+(prereg_stack.md). The defence effect is measured too, but its size as a multiplier on a
+projection is still a modelling choice, and nothing has tested acting on it.
+
+Being right about the number is not the same as it being worth acting on. A stacked pair
+adds about half a point of spread to a lineup whose weekly spread is already 21 to 23, and
+paying up to a projected point to start one lost 0.1 of all-play in both designs, positive
+in one season of five. So this stays off by default, every caller is gated on the flag,
+and it is here to price a lineup honestly rather than to chase width.
 """
 import numpy as np
 import pandas as pd

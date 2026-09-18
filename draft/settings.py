@@ -126,10 +126,16 @@ class Settings:
 
     # ---- correlations (off by default: this one changes results by design)
     # A quarterback and his own receiver score together, and both are suppressed by a
-    # strong opposing defence. Neither is measured here; the values below are plausible
-    # rather than fit, so switching this on is taking an assumption, not a fix.
+    # strong opposing defence. The first is now measured rather than assumed: +0.25
+    # against the weekly consensus expectation these tools use, from 2015-20 box scores
+    # (prereg_stack.md), stable to within 0.03 across those six seasons. By role it is
+    # WR1 0.39, WR2 0.33, TE1 0.29 and 0.21 for anyone deeper, which the single number
+    # here averages over. It stays off by default because acting on it lost: paying up
+    # to a point of projection for a stacked lineup cost 0.1 of all-play in both designs.
+    # Opposing offences in the same game correlate at +0.22, measured the same way, but
+    # opp_defence_effect is still an assumption and nothing has tested acting on it.
     correlations: bool = False
-    qb_receiver_rho: float = 0.35
+    qb_receiver_rho: float = 0.25
     opp_defence_effect: float = 0.0
 
     def __post_init__(self):
