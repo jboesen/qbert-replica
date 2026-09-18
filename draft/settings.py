@@ -301,13 +301,25 @@ def announce_run(**knobs):
 # harness keeps the published values because changing them would move printed results;
 # the tools you point at a real league take these instead, and say so when they do.
 LIVE_TOOLS = ("waivers.py", "trade.py", "lineup.py")
-LIVE = dict(replacement="pool", enforce_caps_in_season=True)
+LIVE = dict(replacement="pool")
 
 
 def live_profile(s):
-    """`s` with the live-league assumptions, except any the settings file named itself."""
+    """`s` with the live-league assumptions, except any the settings file named itself.
+
+    Caps are deliberately not in LIVE. The defaults, 2 QB and 2 TE, are values that keep
+    simulated drafters sane rather than a rule real leagues have, and prereg_settings.md
+    measured what enforcing them costs: 1.7 to 2.8 points of all-play, negative in nine
+    of ten season-designs, because a cap of two forbids carrying the spare quarterback or
+    tight end through a bye that hole-aware streaming wins on. A league that really does
+    limit rosters says so by naming its own `caps`, and those are then enforced; ESPN's
+    limits, 4/8/8/3, were harmless in both designs.
+    """
     named = getattr(s, "_named", frozenset())
-    return s.replace(**{k: v for k, v in LIVE.items() if k not in named})
+    out = s.replace(**{k: v for k, v in LIVE.items() if k not in named})
+    if "caps" in named and "enforce_caps_in_season" not in named:
+        out = out.replace(enforce_caps_in_season=True)
+    return out
 
 
 def _startup():

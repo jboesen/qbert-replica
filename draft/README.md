@@ -638,9 +638,15 @@ Two assumptions differ between a real league and the backtest, so the tools you 
 your own league (`waivers.py`, `trade.py`, `lineup.py`) take the live ones by default and
 print which they took. Replacement is the best player actually sitting in your league's
 free pool, rather than a level implied by an assumed count of rostered players; and a
-roster that may not exceed its position caps on draft day may not exceed them in November
-either. The harness keeps the published values, because changing them would move printed
-results. Anything your settings file names itself wins over both, and
+the caps a league really has are enforced all season, not only on draft day. The harness
+keeps the published values, because changing them would move printed results.
+
+The draft's default caps are not one of those live assumptions, and `prereg_settings.md`
+says why: 2 QB and 2 TE keep simulated drafters sane rather than describe a real rule, and
+enforcing them in season costs 1.7 to 2.8 points of all-play because they forbid carrying
+the spare quarterback or tight end through a bye that streaming wins on. Name your
+league's own `caps` and they are enforced; ESPN's own limits were harmless in both
+designs. Anything your settings file names itself wins over both, and
 `--backtest-assumptions` asks a live tool for the harness's values instead.
 
 Override from a JSON file, either a bare settings object or a `"settings"` key added to
